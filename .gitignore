@@ -39,6 +39,7 @@ web/test-results/
 
 # WASM build output
 crates/maru_wasm/pkg/
+web/packages/maru-wasm/pkg/
 
 # Local data
 tmp/

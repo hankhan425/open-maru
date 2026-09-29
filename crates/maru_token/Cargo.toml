@@ -1,0 +1,12 @@
+[package]
+name = "maru_token"
+description = "Biscuit mandate tokens: mint, attenuate, verify (implemented by M01)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true

@@ -1,0 +1,18 @@
+[package]
+name = "maru_wasm"
+description = "wasm-bindgen bindings for maru_core (packaged as @openmaru/maru-wasm)."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# No Cedar in the browser build.
+maru_core = { path = "../maru_core", default-features = false }
+wasm-bindgen.workspace = true
+
+[lints]
+workspace = true
