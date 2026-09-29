@@ -1,0 +1,45 @@
+# OS / editor
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Env and secrets (never commit)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Rust
+target/
+**/*.rs.bk
+
+# Elixir / Phoenix
+_build/
+deps/
+*.ez
+erl_crash.dump
+apps/server/priv/static/
+apps/server/priv/native/
+.elixir_ls/
+.elixir-tools/
+cover/
+/priv/plts/
+*.plt
+
+# Node / web
+node_modules/
+web/dist/
+web/coverage/
+web/playwright-report/
+web/test-results/
+*.tsbuildinfo
+.pnpm-store/
+
+# WASM build output
+crates/maru_wasm/pkg/
+
+# Local data
+tmp/
+*.log

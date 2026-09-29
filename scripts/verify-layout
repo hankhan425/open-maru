@@ -1,0 +1,47 @@
+#!/usr/bin/env bash
+# Verify the repo layout: every directory from docs/mvp/ARCHITECTURE.md §3 and every file listed
+# in the layout table of docs/mvp/README.md exists.
+# Usage: scripts/verify-layout [repo-root]
+set -euo pipefail
+
+root="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+cd "$root"
+
+status=0
+missing() { echo "missing: $1" >&2; status=1; }
+
+dirs=(
+  apps/server apps/server/lib/openmaru apps/server/lib/openmaru_web apps/server/native apps/server/test
+  crates/maru_core crates/maru_token crates/maru_nif crates/maru_wasm crates/maru_cli
+  web web/src/app web/src/routes web/src/features web/src/components web/src/lib web/src/styles
+  web/tests web/tests/e2e
+  runtime/templates/claude-code runtime/e2b_sidecar
+  docs/mvp .github/workflows
+)
+for d in "${dirs[@]}"; do
+  [ -d "$d" ] || missing "$d/"
+done
+
+for f in compose.yaml .github/workflows/ci.yml; do
+  [ -f "$f" ] || missing "$f"
+done
+
+readme=docs/mvp/README.md
+if [ ! -f "$readme" ]; then
+  missing "$readme"
+else
+  # Table rows look like: | `path` | description |  (paths are relative to docs/mvp/)
+  paths="$(sed -nE 's/^\| `([^`]+)` \|.*/\1/p' "$readme")"
+  [ -n "$paths" ] || { echo "no layout table rows found in $readme" >&2; status=1; }
+  while IFS= read -r p; do
+    [ -n "$p" ] || continue
+    if [[ "$p" == *"*"* ]]; then
+      compgen -G "docs/mvp/$p" >/dev/null || missing "docs/mvp/$p (no matches)"
+    else
+      [ -e "docs/mvp/$p" ] || missing "docs/mvp/$p"
+    fi
+  done <<<"$paths"
+fi
+
+if [ "$status" -eq 0 ]; then echo "layout ok"; fi
+exit "$status"
