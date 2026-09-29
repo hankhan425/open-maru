@@ -616,7 +616,21 @@ fn l01_t23_every_lumen_node_span_slices_its_text() {
     let f = parse_ok(LUMEN);
     let nodes = spanned_nodes(&f);
     assert!(nodes.len() > 80, "walked {} nodes", nodes.len());
-    let squash = |s: &str| s.split_whitespace().collect::<String>();
+    // Compare without whitespace and without digit-group `_` (the printer emits numbers
+    // from their values, e.g. `10000` for `10_000`).
+    let squash = |s: &str| {
+        let chars: Vec<char> = s.split_whitespace().collect::<String>().chars().collect();
+        (0..chars.len())
+            .filter(|&i| {
+                let digit = |j: Option<usize>| {
+                    j.and_then(|j| chars.get(j))
+                        .is_some_and(char::is_ascii_digit)
+                };
+                !(chars[i] == '_' && digit(i.checked_sub(1)) && digit(Some(i + 1)))
+            })
+            .map(|i| chars[i])
+            .collect::<String>()
+    };
     for (span, printed) in nodes {
         let text = slice(LUMEN, span);
         assert!(!text.is_empty(), "empty span for {printed:?}");
