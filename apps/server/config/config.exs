@@ -28,8 +28,24 @@ config :openmaru, Oban,
   queues: [default: 10, ledger: 5, webhooks: 10, gateway: 10, runtime: 5, scheduled: 5],
   plugins: [
     {Oban.Plugins.Pruner, max_age: 7 * 24 * 3600},
-    {Oban.Plugins.Cron, crontab: []}
+    {Oban.Plugins.Cron, crontab: [{"17 * * * *", Openmaru.Accounts.PruneWorker}]}
   ]
+
+# C01 accounts. Dev/test values; config/runtime.exs sets production ones.
+# WebAuthn relying party: the web app's origin (Vite dev server).
+config :openmaru, Openmaru.Accounts.WebAuthn,
+  rp_id: "localhost",
+  rp_name: "openmaru",
+  origin: "http://localhost:5173"
+
+# OAuth providers are enabled by a client_id (config/runtime.exs reads them from env).
+config :openmaru, Openmaru.Accounts.OAuth, providers: [github: [], google: []]
+
+# Key for the audit log's IP hash (Openmaru.Audit); derived from SECRET_KEY_BASE in prod.
+config :openmaru, Openmaru.Audit, ip_hash_key: "dev-only audit ip hash key"
+
+# Where OAuth callbacks send the browser.
+config :openmaru, :web_url, "http://localhost:5173"
 
 # Configure the endpoint
 config :openmaru, OpenmaruWeb.Endpoint,

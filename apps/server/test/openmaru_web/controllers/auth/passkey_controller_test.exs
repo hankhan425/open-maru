@@ -33,7 +33,11 @@ defmodule OpenmaruWeb.Auth.PasskeyControllerTest do
     Repo.one!(
       from c in "auth_challenges",
         where: c.id == type(^id, Ecto.UUID),
-        select: %{kind: c.kind, challenge: c.challenge, expires_at: c.expires_at}
+        select: %{
+          kind: c.kind,
+          challenge: c.challenge,
+          expires_at: type(c.expires_at, :utc_datetime_usec)
+        }
     )
   end
 
@@ -161,7 +165,8 @@ defmodule OpenmaruWeb.Auth.PasskeyControllerTest do
             %{"response" => %{"clientDataJSON" => "e30", "attestationObject" => "AA"}},
             %{"response" => %{"clientDataJSON" => "bm90IGpzb24", "attestationObject" => "oA"}}
           ] do
-        {conn, options} = registration_options(recycle(conn))
+        # A fresh IP each round keeps the 11 requests under the auth rate limit.
+        {conn, options} = registration_options(fresh_conn(unique_ip()))
 
         assert %{"error" => %{"code" => "invalid_request"}} =
                  conn |> finish_registration(options, credential) |> json_response(400)

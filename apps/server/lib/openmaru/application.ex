@@ -15,6 +15,7 @@ defmodule Openmaru.Application do
       OpenmaruWeb.Telemetry,
       Openmaru.Repo,
       {Oban, Application.fetch_env!(:openmaru, Oban)},
+      {Openmaru.RateLimit, clean_period: :timer.minutes(1)},
       {DNSCluster, query: Application.get_env(:openmaru, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Openmaru.PubSub},
       # Start to serve requests, typically the last entry

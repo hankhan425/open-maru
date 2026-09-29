@@ -23,6 +23,19 @@ end
 config :openmaru, OpenmaruWeb.Endpoint,
   http: [port: String.to_integer(System.get_env("PORT", "4000"))]
 
+# OAuth credentials (C01). A provider without a client id stays disabled.
+if config_env() != :test do
+  oauth_provider = fn prefix ->
+    [
+      client_id: System.get_env(prefix <> "_CLIENT_ID"),
+      client_secret: System.get_env(prefix <> "_CLIENT_SECRET")
+    ]
+  end
+
+  config :openmaru, Openmaru.Accounts.OAuth,
+    providers: [github: oauth_provider.("GITHUB"), google: oauth_provider.("GOOGLE")]
+end
+
 if config_env() == :prod do
   database_url =
     System.get_env("DATABASE_URL") ||
@@ -56,6 +69,18 @@ if config_env() == :prod do
   host = System.get_env("PHX_HOST") || "example.com"
 
   config :openmaru, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+
+  # C01: the SPA is served from the same host in production.
+  web_url = System.get_env("WEB_URL") || "https://#{host}"
+  config :openmaru, :web_url, web_url
+
+  config :openmaru, Openmaru.Accounts.WebAuthn,
+    rp_id: System.get_env("WEBAUTHN_RP_ID") || URI.parse(web_url).host,
+    rp_name: "openmaru",
+    origin: web_url
+
+  config :openmaru, Openmaru.Audit,
+    ip_hash_key: :crypto.mac(:hmac, :sha256, secret_key_base, "openmaru audit ip hash")
 
   config :openmaru, OpenmaruWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],
