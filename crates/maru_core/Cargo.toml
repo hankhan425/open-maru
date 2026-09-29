@@ -1,0 +1,23 @@
+[package]
+name = "maru_core"
+description = "maru language core: parse, format, check, IR, charter, diff, Cedar decide."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[features]
+default = ["authz"]
+# Reserved for the Cedar compiler and `decide` (L06). Off for WASM builds.
+authz = []
+
+[dependencies]
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+serde.workspace = true
+proptest.workspace = true
+
+[lints]
+workspace = true

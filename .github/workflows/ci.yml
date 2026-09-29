@@ -63,6 +63,32 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('rust-toolchain.toml', '**/Cargo.lock') }}
           restore-keys: cargo-${{ runner.os }}-
       - run: just check-rust
+      # T03: WASM target (maru_core without `authz`) and the @openmaru/maru-wasm Node tests.
+      - name: Build maru_wasm for wasm32-unknown-unknown
+        if: hashFiles('Cargo.toml') != ''
+        run: |
+          rustup target add wasm32-unknown-unknown
+          cargo build -p maru_wasm --target wasm32-unknown-unknown --release
+      - name: T03 script tests
+        if: hashFiles('Cargo.toml') != ''
+        run: scripts/tests/t03.test.sh
+      - uses: taiki-e/install-action@v2
+        if: hashFiles('web/packages/maru-wasm/package.json') != ''
+        with:
+          tool: wasm-pack
+      - uses: actions/setup-node@v4
+        if: hashFiles('web/packages/maru-wasm/package.json') != ''
+        with:
+          node-version-file: .tool-versions
+      - name: Build @openmaru/maru-wasm
+        if: hashFiles('web/packages/maru-wasm/package.json') != ''
+        run: >-
+          wasm-pack build crates/maru_wasm --release --target web
+          --out-dir ../../web/packages/maru-wasm/pkg --out-name maru_wasm --no-pack
+      - name: Test @openmaru/maru-wasm
+        if: hashFiles('web/packages/maru-wasm/package.json') != ''
+        working-directory: web/packages/maru-wasm
+        run: node --test test/*.test.mjs
 
   elixir:
     runs-on: ubuntu-latest
@@ -111,7 +137,8 @@ jobs:
             apps/server/deps
             apps/server/_build
             apps/server/priv/plts
-          key: mix-${{ runner.os }}-${{ hashFiles('.tool-versions', 'apps/server/mix.lock') }}
+            target
+          key: mix-${{ runner.os }}-${{ hashFiles('.tool-versions', 'apps/server/mix.lock', 'rust-toolchain.toml', 'Cargo.lock') }}
           restore-keys: mix-${{ runner.os }}-
       - name: Install dependencies
         if: hashFiles('apps/server/mix.exs') != ''

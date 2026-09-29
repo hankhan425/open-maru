@@ -1,0 +1,23 @@
+[package]
+name = "maru_cli"
+description = "The maru command-line tool."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "maru"
+path = "src/main.rs"
+
+[dependencies]
+maru_core = { path = "../maru_core" }
+clap.workspace = true
+
+[dev-dependencies]
+assert_cmd.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

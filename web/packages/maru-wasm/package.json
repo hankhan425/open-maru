@@ -1,0 +1,24 @@
+{
+  "name": "@openmaru/maru-wasm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "maru_core compiled to WebAssembly (wasm-pack --target web).",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./pkg/maru_wasm.d.ts",
+      "default": "./pkg/maru_wasm.js"
+    },
+    "./maru_wasm_bg.wasm": "./pkg/maru_wasm_bg.wasm"
+  },
+  "files": [
+    "pkg/maru_wasm.js",
+    "pkg/maru_wasm.d.ts",
+    "pkg/maru_wasm_bg.wasm",
+    "pkg/maru_wasm_bg.wasm.d.ts"
+  ],
+  "scripts": {
+    "build": "wasm-pack build ../../../crates/maru_wasm --release --target web --out-dir ../../web/packages/maru-wasm/pkg --out-name maru_wasm --no-pack",
+    "test": "node --test test/*.test.mjs"
+  }
+}
