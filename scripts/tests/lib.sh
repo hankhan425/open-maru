@@ -2,6 +2,7 @@
 # Tiny test harness for repo scripts. Source it, define `test_*` functions
 # whose names start with the task test ID (e.g. test_T01_T01_...), then call run_tests.
 set -uo pipefail
+# shellcheck disable=SC2034  # FAIL_OUT is read by the sourcing test files
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PASSED=0
@@ -17,6 +18,7 @@ skip() {
 # Usage: expect_fail <script> [args...]; prints combined output on stdout via $FAIL_OUT.
 expect_fail() {
   [ -x "$1" ] || { echo "script not executable/missing: $1"; return 1; }
+  # shellcheck disable=SC2034
   if FAIL_OUT="$("$@" 2>&1)"; then echo "expected failure but exited 0"; return 1; fi
 }
 

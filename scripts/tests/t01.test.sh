@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # Tests for task T01 (monorepo, toolchains, CI). Run: scripts/tests/t01.test.sh
+# shellcheck source=lib.sh
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 # T01-T01 verify-layout exits 0 and checks every ARCHITECTURE §3 directory
@@ -64,10 +65,10 @@ test_T01_T04_services_come_up_within_60s() {
 }
 
 test_T01_T04_compose_defines_postgres_and_minio() {
-  cd "$ROOT"
+  cd "$ROOT" || exit 1
   grep -q 'postgres:16' compose.yaml
   grep -q 'openmaru_dev' compose.yaml
-  grep -q 'openmaru_test' compose.yaml
+  grep -q 'openmaru_test' scripts/postgres-init/*.sql
   grep -qi 'minio' compose.yaml
   grep -q 'openmaru-dev' compose.yaml
   docker compose config -q 2>/dev/null || skip "docker compose unavailable for config validation"
@@ -76,13 +77,13 @@ test_T01_T04_compose_defines_postgres_and_minio() {
 # T01-T05 actionlint passes on all workflow files
 test_T01_T05_actionlint_passes() {
   command -v actionlint >/dev/null || { echo "actionlint not installed"; exit 1; }
-  cd "$ROOT"
+  cd "$ROOT" || exit 1
   ls .github/workflows/*.yml >/dev/null
   actionlint .github/workflows/*.yml
 }
 
 test_T01_T05_ci_has_required_jobs_and_triggers() {
-  cd "$ROOT"
+  cd "$ROOT" || exit 1
   local job
   for job in rust elixir web layout; do
     grep -Eq "^  ${job}:" .github/workflows/ci.yml || { echo "missing job $job"; exit 1; }
@@ -115,7 +116,7 @@ test_T01_T06_verify_toolchain_fails_when_ci_hardcodes_version() {
 }
 
 test_T01_T06_rust_toolchain_has_wasm_target_and_components() {
-  cd "$ROOT"
+  cd "$ROOT" || exit 1
   grep -q 'wasm32-unknown-unknown' rust-toolchain.toml
   grep -q 'rustfmt' rust-toolchain.toml
   grep -q 'clippy' rust-toolchain.toml
