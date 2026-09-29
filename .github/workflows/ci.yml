@@ -95,7 +95,7 @@ jobs:
           PGPASSWORD=postgres psql -h localhost -U postgres -c 'CREATE DATABASE openmaru_test'
           docker run -d --name minio -p 9000:9000 \
             -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
-            minio/minio:latest server /data
+            bitnamilegacy/minio:latest
       - name: Install Rust toolchain from rust-toolchain.toml
         if: hashFiles('apps/server/mix.exs') != ''
         run: rustup show active-toolchain || rustup toolchain install

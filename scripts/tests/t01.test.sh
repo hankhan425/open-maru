@@ -61,7 +61,11 @@ test_T01_T03_justfile_has_required_recipes() {
 # T01-T04 `just services-up && scripts/wait-for-services` succeeds within 60 s (needs Docker; CI job `layout`)
 test_T01_T04_services_come_up_within_60s() {
   docker info >/dev/null 2>&1 || skip "docker daemon not running (covered by CI job layout)"
-  cd "$ROOT" && just services-up && timeout 60 scripts/wait-for-services
+  cd "$ROOT" || exit 1
+  local start=$SECONDS
+  just services-up
+  TIMEOUT=60 scripts/wait-for-services
+  [ $((SECONDS - start)) -le 60 ] || { echo "took longer than 60s"; exit 1; }
 }
 
 test_T01_T04_compose_defines_postgres_and_minio() {
