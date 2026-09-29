@@ -802,3 +802,59 @@ fn l01_diagnostics_are_sorted_by_position() {
     assert_eq!(offsets, sorted);
     assert_eq!(codes(&out), vec![Code::E101, Code::E107, Code::E101]);
 }
+
+// L01 extra: an item of an enclosing block written inside a properly closed block is a
+// misplaced item: one E201, the misplaced block is skipped, the goal continues.
+#[test]
+fn l01_misplaced_block_inside_closed_goal_is_one_diagnostic() {
+    let src = goal_with("    circle c2 {\n      seats: 1\n    }\n    purpose \"after\"");
+    let out = parse(&src);
+    assert_eq!(codes(&out), vec![Code::E201], "{:#?}", out.diagnostics);
+    assert_eq!(slice(&src, out.diagnostics[0].span), "circle");
+    assert!(
+        out.diagnostics[0]
+            .message
+            .starts_with("expected a goal item")
+    );
+    let f = out.file.expect("file");
+    assert!(matches!(last_goal_item(&f), GoalItem::Purpose(s) if s.value == "after"));
+    assert!(
+        !org_items(&f)
+            .iter()
+            .any(|i| matches!(i, OrgItem::Circle(c) if c.id.name == "c2"))
+    );
+}
+
+// L01 extra: a goal missing its `}` before the next goal is one E201; both goals parse.
+#[test]
+fn l01_unclosed_goal_before_next_goal_is_one_diagnostic() {
+    let src =
+        org_with("  goal a \"A\" {\n    steward: core\n\n  goal b \"B\" {\n    steward: core\n  }");
+    let out = parse(&src);
+    assert_eq!(codes(&out), vec![Code::E201], "{:#?}", out.diagnostics);
+    let d = &out.diagnostics[0];
+    assert_eq!(slice(&src, d.span), "goal");
+    assert_eq!(d.span.start.offset, src.find("goal b").expect("goal b"));
+    assert!(
+        d.message.contains("expected `}` to close the goal block"),
+        "{}",
+        d.message
+    );
+    let f = out.file.expect("file");
+    let ids: Vec<&str> = goals(&f).iter().map(|g| g.id.name.as_str()).collect();
+    assert_eq!(ids, ["a", "b"]);
+}
+
+// L01 extra: item lists in messages use the right article.
+#[test]
+fn l01_unknown_org_item_message() {
+    let out = parse(&org_with("  budget: 5"));
+    assert_eq!(codes(&out), vec![Code::E201]);
+    assert!(
+        out.diagnostics[0]
+            .message
+            .starts_with("expected an org item (`purpose`"),
+        "{}",
+        out.diagnostics[0].message
+    );
+}
