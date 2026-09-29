@@ -7,13 +7,14 @@ defmodule Openmaru.Application do
 
   @impl true
   def start(_type, _args) do
+    install_log_scrubber()
+
     children = [
       OpenmaruWeb.Telemetry,
       Openmaru.Repo,
+      {Oban, Application.fetch_env!(:openmaru, Oban)},
       {DNSCluster, query: Application.get_env(:openmaru, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Openmaru.PubSub},
-      # Start a worker by calling: Openmaru.Worker.start_link(arg)
-      # {Openmaru.Worker, arg},
       # Start to serve requests, typically the last entry
       OpenmaruWeb.Endpoint
     ]
@@ -22,6 +23,17 @@ defmodule Openmaru.Application do
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Openmaru.Supervisor]
     Supervisor.start_link(children, opts)
+  end
+
+  # SPEC-09 §3: every handler sees scrubbed metadata and reports.
+  defp install_log_scrubber do
+    case :logger.add_primary_filter(
+           :openmaru_scrubber,
+           {&Openmaru.Logger.Scrubber.filter/2, []}
+         ) do
+      :ok -> :ok
+      {:error, {:already_exist, _}} -> :ok
+    end
   end
 
   # Tell Phoenix to update the endpoint configuration

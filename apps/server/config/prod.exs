@@ -15,3 +15,6 @@ config :logger, level: :info
 
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.
+
+# Structured JSON logs, scrubbed (SPEC-09 §3).
+config :logger, :default_handler, formatter: {Openmaru.Logger.JSONFormatter, %{}}

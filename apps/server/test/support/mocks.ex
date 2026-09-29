@@ -1,6 +1,10 @@
+# Defined at compile time so modules configured to call them compile without warnings.
+Mox.defmock(Openmaru.ClockMock, for: Openmaru.Clock)
+Mox.defmock(Openmaru.HealthMock, for: Openmaru.Health)
+
 defmodule Openmaru.Mocks do
   @moduledoc """
-  Default stubs for the Mox mocks defined in `test/test_helper.exs`.
+  Default stubs for the Mox mocks defined above.
 
   Every case template calls `stub_defaults/0`, so tests see real behaviour
   unless they override a mock with `Mox.stub/3` or `Mox.expect/4`.

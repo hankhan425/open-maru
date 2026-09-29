@@ -9,4 +9,10 @@ defmodule Openmaru.Clock do
 
   @doc "Returns the current UTC time with microsecond precision."
   @callback now() :: DateTime.t()
+
+  @impl_module Application.compile_env(:openmaru, :clock, Openmaru.Clock.System)
+
+  @doc "Returns the current UTC time from the configured implementation."
+  @spec now() :: DateTime.t()
+  def now, do: @impl_module.now()
 end

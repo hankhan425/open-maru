@@ -13,6 +13,9 @@ config :openmaru, Openmaru.Repo,
   pool: Ecto.Adapters.SQL.Sandbox,
   pool_size: System.schedulers_online() * 2
 
+# Jobs are enqueued but never run automatically; use Oban.Testing.perform_job/2.
+config :openmaru, Oban, testing: :manual
+
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
 config :openmaru, OpenmaruWeb.Endpoint,
@@ -20,7 +23,7 @@ config :openmaru, OpenmaruWeb.Endpoint,
   secret_key_base: "YV2rAgbUQ7fehb6tgpSJctFplrydHXOhT8BdHVaQwog+Z5MC9Uk2JqlfoByr2Gtu",
   server: false
 
-# Mox mocks (defined in test/test_helper.exs) replace these implementations.
+# Mox mocks (defined in test/support/mocks.ex) replace these implementations.
 config :openmaru, clock: Openmaru.ClockMock, health: Openmaru.HealthMock
 
 # Print only warnings and errors during test

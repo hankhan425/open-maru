@@ -142,6 +142,7 @@ defmodule OpenmaruWeb.Plugs.IdempotencyTest do
   test "T02-T08 a request still in progress under the same key is a conflict" do
     insert!(:idempotency_key,
       key: "key-1",
+      principal: "anonymous:127.0.0.1",
       request_hash: "in-flight",
       status: nil,
       body: nil,
@@ -168,5 +169,36 @@ defmodule OpenmaruWeb.Plugs.IdempotencyTest do
     assert <<_::48, 7::4, _::bitstring>> = Ecto.UUID.dump!(row.id)
     assert row.expires_at == DateTime.add(@t0, 24 * 3600, :second)
     assert row.status == 201
+  end
+
+  test "T02-T08 an in-progress key abandoned for 5 minutes can be retried" do
+    request(%{"name" => "a"}, status: 201)
+    Openmaru.Repo.update_all(Openmaru.Idempotency.Key, set: [status: nil, body: nil])
+
+    stub(ClockMock, :now, fn -> DateTime.add(@t0, 5 * 60, :second) end)
+    retry = request(%{"name" => "a"})
+
+    assert count_executions() == 2
+    assert retry.status == 201
+  end
+
+  test "T02-T08 agent and mandate actors are scoped by kind and id" do
+    agent = {:agent, %{id: "0190c1f4-0000-7000-8000-000000000003"}, %{}}
+    person = {:person, %{id: "0190c1f4-0000-7000-8000-000000000003"}}
+
+    request(%{"name" => "a"}, actor: agent)
+    request(%{"name" => "a"}, actor: person)
+    request(%{"name" => "a"}, actor: agent)
+
+    assert count_executions() == 2
+
+    assert Openmaru.Idempotency.Key
+           |> Openmaru.Repo.all()
+           |> Enum.map(& &1.principal)
+           |> Enum.sort() ==
+             [
+               "agent:0190c1f4-0000-7000-8000-000000000003",
+               "person:0190c1f4-0000-7000-8000-000000000003"
+             ]
   end
 end

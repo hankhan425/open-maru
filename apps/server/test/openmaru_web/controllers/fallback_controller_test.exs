@@ -90,4 +90,25 @@ defmodule OpenmaruWeb.FallbackControllerTest do
 
     assert is_binary(message) and message != ""
   end
+
+  test "T02-T02 a changeset error renders validation_failed with field errors", %{conn: conn} do
+    changeset =
+      {%{}, %{name: :string}}
+      |> Ecto.Changeset.cast(%{}, [:name])
+      |> Ecto.Changeset.validate_required([:name])
+
+    conn = FallbackController.call(conn, {:error, changeset})
+
+    assert %{
+             "error" => %{
+               "code" => "validation_failed",
+               "details" => %{"fields" => %{"name" => ["can't be blank"]}}
+             }
+           } = json_response(conn, 422)
+  end
+
+  test "T02-T02 unknown codes map to 500 and raised errors carry their status" do
+    assert Error.status(:no_such_code) == 500
+    assert Plug.Exception.status(Error.new(:goal_paused)) == 423
+  end
 end

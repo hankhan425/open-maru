@@ -1,21 +1,39 @@
 defmodule OpenmaruWeb.ErrorJSON do
   @moduledoc """
-  This module is invoked by your endpoint in case of errors on JSON requests.
+  Renders the error envelope `{"error":{"code","message","details"}}` (SPEC-07 §2).
 
-  See config/config.exs.
+  `error/1` renders an `Openmaru.Error`. `render/2` is called by the endpoint for
+  exceptions (unknown routes, malformed bodies, crashes); it derives the code from the
+  HTTP status and never includes exception messages, which may echo request content.
   """
 
-  # If you want to customize a particular status code,
-  # you may add your own clauses, such as:
-  #
-  # def render("500.json", _assigns) do
-  #   %{errors: %{detail: "Internal Server Error"}}
-  # end
+  alias Openmaru.Error
 
-  # By default, Phoenix returns the status message from
-  # the template name. For example, "404.json" becomes
-  # "Not Found".
-  def render(template, _assigns) do
-    %{errors: %{detail: Phoenix.Controller.status_message_from_template(template)}}
+  @doc "The envelope for an `Openmaru.Error`."
+  @spec error(Error.t()) :: %{error: %{code: String.t(), message: String.t(), details: map()}}
+  def error(%Error{code: code, message: message, details: details}) do
+    %{error: %{code: Atom.to_string(code), message: message, details: details}}
   end
+
+  @doc false
+  def render(_template, %{reason: %Error{} = error}), do: error(error)
+
+  def render(_template, %{reason: %Plug.Parsers.ParseError{}}) do
+    error(Error.new(:invalid_request, "Malformed request body"))
+  end
+
+  def render(template, _assigns) do
+    status = template |> String.split(".") |> hd() |> String.to_integer()
+    message = Phoenix.Controller.status_message_from_template(template)
+    error(Error.new(code_for_status(status), message))
+  end
+
+  defp code_for_status(400), do: :invalid_request
+  defp code_for_status(401), do: :unauthenticated
+  defp code_for_status(403), do: :forbidden
+  defp code_for_status(404), do: :not_found
+  defp code_for_status(422), do: :validation_failed
+  defp code_for_status(429), do: :rate_limited
+  defp code_for_status(status) when status < 500, do: :invalid_request
+  defp code_for_status(_status), do: :internal_error
 end
