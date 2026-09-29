@@ -28,11 +28,16 @@ defmodule OpenmaruWeb.ConnCase do
       import Plug.Conn
       import Phoenix.ConnTest
       import OpenmaruWeb.ConnCase
+      import Openmaru.Factory
+      import Openmaru.Fixtures
+      import Mox
     end
   end
 
   setup tags do
     Openmaru.DataCase.setup_sandbox(tags)
+    Openmaru.Mocks.stub_defaults()
+    Mox.verify_on_exit!()
     {:ok, conn: Phoenix.ConnTest.build_conn()}
   end
 end

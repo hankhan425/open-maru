@@ -24,11 +24,16 @@ defmodule Openmaru.DataCase do
       import Ecto.Changeset
       import Ecto.Query
       import Openmaru.DataCase
+      import Openmaru.Factory
+      import Openmaru.Fixtures
+      import Mox
     end
   end
 
   setup tags do
     Openmaru.DataCase.setup_sandbox(tags)
+    Openmaru.Mocks.stub_defaults()
+    Mox.verify_on_exit!()
     :ok
   end
 

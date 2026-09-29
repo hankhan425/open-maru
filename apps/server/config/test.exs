@@ -20,6 +20,9 @@ config :openmaru, OpenmaruWeb.Endpoint,
   secret_key_base: "YV2rAgbUQ7fehb6tgpSJctFplrydHXOhT8BdHVaQwog+Z5MC9Uk2JqlfoByr2Gtu",
   server: false
 
+# Mox mocks (defined in test/test_helper.exs) replace these implementations.
+config :openmaru, clock: Openmaru.ClockMock, health: Openmaru.HealthMock
+
 # Print only warnings and errors during test
 config :logger, level: :warning
 
