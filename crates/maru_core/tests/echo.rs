@@ -27,7 +27,12 @@ fn t03_t02_echo_json_vectors_pass() {
     let vectors = vectors();
     assert!(!vectors.is_empty());
     for v in vectors {
-        assert_eq!(echo_json(&v.input).as_deref(), Ok(v.output.as_str()), "input: {:?}", v.input);
+        assert_eq!(
+            echo_json(&v.input).as_deref(),
+            Ok(v.output.as_str()),
+            "input: {:?}",
+            v.input
+        );
     }
 }
 
@@ -35,7 +40,19 @@ fn t03_t02_echo_json_vectors_pass() {
 #[test]
 fn t03_t02_invalid_json_is_invalid_json_error() {
     let deep = "[".repeat(200) + &"]".repeat(200);
-    for input in ["", "   ", "{", "[1,]", "{\"a\":1} x", "nul", "'a'", "{a:1}", "01", "NaN", &deep] {
+    for input in [
+        "",
+        "   ",
+        "{",
+        "[1,]",
+        "{\"a\":1} x",
+        "nul",
+        "'a'",
+        "{a:1}",
+        "01",
+        "NaN",
+        &deep,
+    ] {
         assert!(
             matches!(echo_json(input), Err(CoreError::InvalidJson(_))),
             "accepted {input:?}"
