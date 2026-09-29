@@ -68,16 +68,18 @@ ARCHITECTURE > PRD.
   now also says parse errors stop semantic checks, so the item the parser drops for E310 (or
   any other error) cannot lead to a second diagnostic such as E304 or W404 (L03-T31).
 
-### OQ-4: Upper limits for whole numbers and durations
+### OQ-4: Upper limits for whole numbers, durations and the derived monthly limit
 - **Task:** L01
-- **Status:** open
+- **Status:** resolved
 - **Conflict:** SPEC-01 caps money at 2^53 − 1 micros (§4.8) but gives no maximum for `INT`
   (seats, sponsors, approval counts, thresholds) or `DURATION`. Values the parser could store
   still break later layers: SPEC-02 §4.1 sets `deadline_at = now + within.secs`, which passes
   year 9999 (Elixir's `DateTime` limit) for `within 10000y`; a `term` of 69y or more
   overflows a Postgres `integer` (SPEC-02 §2 did not give `term_secs` a type); counts above
   2^53 lose precision when the web reads the IR in JS, and above 2^31 − 1 they overflow an
-  `integer` column.
+  `integer` column. Separately, §6.1's `unapproved_monthly_max_micros` multiplies day limits
+  by 31 and sums every line, so one `usd 300_000_000 / day` line passes the 2^53 − 1 bound
+  that §6 sets for IR money, and 66 maximal lines overflow `u64`.
 - **Options:** (a) parser limits chosen from where the values are stored, reported as
   E103/E104 like money's E310; (b) checker range errors with new codes; (c) no limits and
   `bigint` or overflow checks in every consumer.
@@ -85,4 +87,10 @@ ARCHITECTURE > PRD.
   ≤ 100 years = 3_153_600_000 s (`ast::MAX_DURATION_SECS`, E104; `100y`, `36500d`, `5214w`
   pass, `101y`, `5215w` fail). SPEC-02 `circles.term_secs` is `bigint`, since 100y exceeds
   `integer`. Metric values (`SIGNED`) stay unlimited digit strings.
-- **Resolution:** pending confirmation of the limits; then add them to SPEC-01 §2 and §4.8.
+- **Resolution:** (a), with the interim values, in SPEC-01 §2 and §4.8. One 100-year cap
+  for every duration: it is far below the technical ceiling (Elixir's year 9999, about 7,970
+  years from 2026) and far above realistic terms and timeouts. A shorter cap for `within`
+  alone is possible later if long-pending expense claims holding funds (SPEC-04 §5.2) become
+  a problem. The derived monthly limit is summed exactly; over the money maximum the checker
+  reports the new E318 on the goal (SPEC-01 §5, §6.1; L03-T32), rather than saturating, which
+  would understate the bound the charter states.

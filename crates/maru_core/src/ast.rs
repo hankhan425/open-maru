@@ -17,10 +17,10 @@ use crate::span::Span;
 pub const MAX_MONEY_MICROS: u64 = 9_007_199_254_740_991;
 
 /// The largest whole number in a count position (seats, sponsors, approval counts,
-/// thresholds): 2^31 − 1, so it fits a Postgres `integer` and a JS number (interim, OQ-4).
+/// thresholds): 2^31 − 1, so it fits a Postgres `integer` and a JS number (SPEC-01 §4.8).
 pub const MAX_INT: u64 = 2_147_483_647;
 
-/// The longest duration, in seconds: 100 years of 365 days (interim, OQ-4). Deadlines
+/// The longest duration, in seconds: 100 years of 365 days (SPEC-01 §4.8). Deadlines
 /// computed from it stay well inside Elixir's and Postgres's date ranges.
 pub const MAX_DURATION_SECS: u64 = 100 * 31_536_000;
 

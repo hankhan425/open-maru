@@ -68,6 +68,7 @@ codes! {
     E315: "`on_close: transfer` targets itself or an unknown goal.",
     E316: "Amendment deadlock.",
     E317: "Steward circle has no holders.",
+    E318: "A goal's unapproved monthly spend exceeds the money maximum.",
     E319: "Duration must be > 0.",
     E322: "`approve(members, …)` is not allowed.",
     E323: "Duplicate holder in a circle.",
