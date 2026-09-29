@@ -19,10 +19,10 @@ Canonical example: `examples/lumen.maru`. Its golden charter: `examples/lumen.ch
 | `IDENT` | `[a-z][a-z0-9_]*`, max 40 chars, not a keyword (E107) |
 | `HANDLE` | `@[a-z0-9][a-z0-9_-]{1,29}` (E106). Refers to a platform user handle. |
 | `STRING` | `"…"`, escapes `\"` `\\` `\n`, no raw newline (E108), max 500 chars after unescaping (E108) |
-| `INT` | `[0-9]+` with optional single `_` between digit groups (`12_000`); no leading/trailing/double `_` (E103) |
+| `INT` | `[0-9]+` with optional single `_` between digit groups (`12_000`); no leading/trailing/double `_` (E103); as a count (seats, sponsors, approval count, threshold) at most 2_147_483_647 (E103) |
 | `DECIMAL` | `INT "." [0-9]+` (money allows max 6 fractional digits — E311) |
 | `SIGNED` | optional `-` then `INT` or `DECIMAL` (metric values only) |
-| `DURATION` | `INT` + unit `m` (minutes), `h`, `d`, `w` (7d), `y` (365d). Must be > 0 (E319). (E104) |
+| `DURATION` | `INT` + unit `m` (minutes), `h`, `d`, `w` (7d), `y` (365d). Must be > 0 (E319) and at most 100 years (E104). (E104) |
 | `DATE` | `YYYY-MM-DD`, valid Gregorian date, years 2000–2999 (E105) |
 | `THRESHOLD` | `INT "/" INT` (fraction, 0 < a/b ≤ 1) or `INT "%"` (1–100) (E308) |
 | Punctuation | `{ } ( ) : , / <= >= < > == ->` |
@@ -135,18 +135,21 @@ Parsing is error-tolerant: on a syntax error inside a block, the parser skips to
 ### 4.8 Money, time, periods
 - Money is integer micro-USD. `usd 12.50` = 12_500_000. Max per literal 9_007_199_254_740_991 micros (E310). Must be > 0 (E309).
 - Periods are UTC calendar periods: day; ISO week starting Monday 00:00; month starting on the 1st 00:00.
-- Durations: `m`=60s, `h`=3600s, `d`=86400s, `w`=604800s, `y`=31536000s.
+- Durations: `m`=60s, `h`=3600s, `d`=86400s, `w`=604800s, `y`=31536000s. At most 100 years = 3_153_600_000 s in any unit (`36500d` and `5214w` pass, `5215w` fails; E104), so every deadline and term end computed from a spec stays within the date range of Elixir, Postgres and JS.
+- Counts (`seats`, `sponsors`, approval counts, threshold numbers) are at most 2_147_483_647 (E103), so they fit a Postgres `integer` and a JS number. Metric values have no limit (the IR keeps them as strings).
 
 ## 5. Static checks
 
 The checker is pure: `check(source, opts) → {diagnostics, ir?}`. IR is returned only when there are no errors. `opts.now` (optional ISO timestamp) enables time-relative warnings; without it they are skipped so checking stays deterministic.
 
+Checking has two stages. The parser reports E1xx, E2xx, E310 and E311. If it reports any error, `check` returns those diagnostics alone: no semantic checks run and there is no IR. The parser leaves an item with an error out of the tree, so checking that tree would report the same mistake again (a malformed `seats` would also be a missing one, E304). Semantic checks (the other E3xx codes and all W4xx) run only on a source that parses without errors.
+
 | Code | Severity | Condition |
 |---|---|---|
-| E101 | error | Unexpected character |
-| E102 | error | Unterminated string |
-| E103 | error | Malformed number (underscores) |
-| E104 | error | Malformed duration |
+| E101 | error | Unexpected character, or unknown escape in a string (at the escape) |
+| E102 | error | Unterminated string (one that runs to end of file is not also reported as E202) |
+| E103 | error | Malformed number (underscores), or number too large |
+| E104 | error | Malformed duration, or duration too long |
 | E105 | error | Invalid date |
 | E106 | error | Invalid handle |
 | E107 | error | Invalid or reserved identifier |
@@ -164,14 +167,15 @@ The checker is pure: `check(source, opts) → {diagnostics, ir?}`. IR is returne
 | E307 | error | approve count < 1 or > seats |
 | E308 | error | Threshold out of range |
 | E309 | error | Money must be > 0 |
-| E310 | error | Money exceeds maximum |
-| E311 | error | Money has more than 6 decimal places |
+| E310 | error | Money exceeds maximum (reported by the parser) |
+| E311 | error | Money has more than 6 decimal places (reported by the parser) |
 | E312 | error | Two mandates for the same principal in a goal |
 | E313 | error | Two spend lines for the same category in a mandate |
 | E314 | error | Two rules with the same subject in a goal |
 | E315 | error | `on_close: transfer` targets itself or an unknown goal |
 | E316 | error | Amendment deadlock: `amend` cannot be satisfied by declared holders (approve N > holders of C; vote on a circle with 0 holders) |
 | E317 | error | Steward circle has no holders |
+| E318 | error | A goal's `unapproved_monthly_max_micros` (§6.1) exceeds 9_007_199_254_740_991 micros |
 | E319 | error | Duration must be > 0 |
 | E322 | error | `approve(members, …)` is not allowed |
 | E323 | error | Duplicate holder in a circle |
@@ -243,6 +247,7 @@ For each goal, `unapproved_monthly_max_micros` is an upper bound on spend possib
 - Exclude a (mandate, category) line if some rule in the goal has subject `spend` covering that category (category matches or is omitted), **no** amount threshold, and `else deny`.
 - Rules with thresholds or `else allow` do not exclude anything.
 - Expired mandates are still counted (the analysis is time-independent).
+- The sum is exact. If it exceeds the money maximum (§4.8), the checker reports E318 on the goal, so every money value in the IR stays ≤ 2^53−1 and the bound the charter states is never understated.
 
 ## 7. Formatter
 

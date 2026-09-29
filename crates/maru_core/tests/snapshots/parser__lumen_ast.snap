@@ -1,0 +1,439 @@
+---
+source: crates/maru_core/tests/parser.rs
+expression: ast_json(&f)
+---
+{
+  "org": {
+    "leading": [
+      {
+        "text": "# Lumen Studio — an open cloud image editor"
+      }
+    ],
+    "node": {
+      "body": {
+        "items": [
+          {
+            "node": {
+              "purpose": {
+                "value": "Build and maintain an open, browser-based image editor."
+              }
+            }
+          },
+          {
+            "node": {
+              "members": {
+                "kind": {
+                  "invite": {
+                    "sponsors": {
+                      "value": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          {
+            "node": {
+              "amend": {
+                "procedure": {
+                  "kind": {
+                    "vote": {
+                      "group": {
+                        "circle": {
+                          "name": "core"
+                        }
+                      },
+                      "threshold": {
+                        "kind": {
+                          "fraction": {
+                            "den": {
+                              "value": 3
+                            },
+                            "num": {
+                              "value": 2
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "timeout": {
+                  "outcome": "deny",
+                  "within": {
+                    "unit": "d",
+                    "value": 7
+                  }
+                }
+              }
+            }
+          },
+          {
+            "node": {
+              "circle": {
+                "body": {
+                  "items": [
+                    {
+                      "node": {
+                        "seats": {
+                          "value": 3
+                        }
+                      }
+                    },
+                    {
+                      "node": {
+                        "term": {
+                          "unit": "y",
+                          "value": 1
+                        }
+                      }
+                    },
+                    {
+                      "node": {
+                        "holders": [
+                          {
+                            "name": "mina"
+                          },
+                          {
+                            "name": "jo"
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                },
+                "id": {
+                  "name": "core"
+                }
+              }
+            }
+          },
+          {
+            "node": {
+              "agent": {
+                "body": {
+                  "items": [
+                    {
+                      "node": {
+                        "operator": {
+                          "name": "mina"
+                        }
+                      }
+                    },
+                    {
+                      "node": {
+                        "runtime": "hosted"
+                      }
+                    }
+                  ]
+                },
+                "id": {
+                  "name": "builder"
+                }
+              }
+            }
+          },
+          {
+            "node": {
+              "goal": {
+                "body": {
+                  "items": [
+                    {
+                      "node": {
+                        "steward": {
+                          "name": "core"
+                        }
+                      }
+                    },
+                    {
+                      "node": {
+                        "purpose": {
+                          "value": "Ship a usable editor with layers, masks and export."
+                        }
+                      }
+                    },
+                    {
+                      "node": {
+                        "fund": {
+                          "amount": {
+                            "micros": 12000000000
+                          },
+                          "schedule": {
+                            "every": "month"
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "node": {
+                        "on_underfunded": "pause"
+                      }
+                    },
+                    {
+                      "node": {
+                        "on_close": "return_treasury"
+                      }
+                    },
+                    {
+                      "node": {
+                        "success": {
+                          "by": {
+                            "day": 30,
+                            "month": 6,
+                            "year": 2027
+                          },
+                          "cmp": ">=",
+                          "metric": {
+                            "name": "weekly_active_users"
+                          },
+                          "value": {
+                            "frac": null,
+                            "int": "10000",
+                            "negative": false
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "node": {
+                        "mandate": {
+                          "body": {
+                            "items": [
+                              {
+                                "node": {
+                                  "spend": {
+                                    "category": "llm",
+                                    "limit": {
+                                      "micros": 4000000000
+                                    },
+                                    "period": "month"
+                                  }
+                                }
+                              },
+                              {
+                                "node": {
+                                  "spend": {
+                                    "category": "compute",
+                                    "limit": {
+                                      "micros": 1000000000
+                                    },
+                                    "period": "month"
+                                  }
+                                }
+                              },
+                              {
+                                "node": {
+                                  "per_request": {
+                                    "micros": 25000000
+                                  }
+                                }
+                              },
+                              {
+                                "node": {
+                                  "can": [
+                                    {
+                                      "kind": "claim_tasks"
+                                    },
+                                    {
+                                      "kind": "post_evidence"
+                                    },
+                                    {
+                                      "kind": {
+                                        "report_metric": {
+                                          "name": "weekly_active_users"
+                                        }
+                                      }
+                                    }
+                                  ]
+                                }
+                              },
+                              {
+                                "node": {
+                                  "expires": {
+                                    "day": 1,
+                                    "month": 1,
+                                    "year": 2027
+                                  }
+                                }
+                              }
+                            ]
+                          },
+                          "principal": {
+                            "agent": {
+                              "name": "builder"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "node": {
+                        "mandate": {
+                          "body": {
+                            "items": [
+                              {
+                                "node": {
+                                  "spend": {
+                                    "category": "expense",
+                                    "limit": {
+                                      "micros": 500000000
+                                    },
+                                    "period": "month"
+                                  }
+                                }
+                              },
+                              {
+                                "node": {
+                                  "can": [
+                                    {
+                                      "kind": "claim_tasks"
+                                    },
+                                    {
+                                      "kind": "create_tasks"
+                                    },
+                                    {
+                                      "kind": "post_evidence"
+                                    }
+                                  ]
+                                }
+                              }
+                            ]
+                          },
+                          "principal": {
+                            "person": {
+                              "name": "jo"
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "node": {
+                        "rule": {
+                          "procedure": {
+                            "kind": {
+                              "approve": {
+                                "count": {
+                                  "value": 1
+                                },
+                                "group": {
+                                  "circle": {
+                                    "name": "core"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "subject": {
+                            "kind": {
+                              "spend": {
+                                "category": null,
+                                "over": {
+                                  "micros": 500000000
+                                }
+                              }
+                            }
+                          },
+                          "timeout": {
+                            "outcome": "deny",
+                            "within": {
+                              "unit": "h",
+                              "value": 48
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "node": {
+                        "rule": {
+                          "procedure": {
+                            "kind": {
+                              "approve": {
+                                "count": {
+                                  "value": 1
+                                },
+                                "group": {
+                                  "circle": {
+                                    "name": "core"
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "subject": {
+                            "kind": {
+                              "spend": {
+                                "category": "expense",
+                                "over": null
+                              }
+                            }
+                          },
+                          "timeout": {
+                            "outcome": "deny",
+                            "within": {
+                              "unit": "d",
+                              "value": 7
+                            }
+                          }
+                        }
+                      }
+                    },
+                    {
+                      "node": {
+                        "rule": {
+                          "procedure": {
+                            "kind": {
+                              "vote": {
+                                "group": {
+                                  "circle": {
+                                    "name": "core"
+                                  }
+                                },
+                                "threshold": {
+                                  "kind": {
+                                    "fraction": {
+                                      "den": {
+                                        "value": 3
+                                      },
+                                      "num": {
+                                        "value": 2
+                                      }
+                                    }
+                                  }
+                                }
+                              }
+                            }
+                          },
+                          "subject": {
+                            "kind": "close"
+                          },
+                          "timeout": {
+                            "outcome": "deny",
+                            "within": {
+                              "unit": "d",
+                              "value": 7
+                            }
+                          }
+                        }
+                      }
+                    }
+                  ]
+                },
+                "id": {
+                  "name": "editor"
+                },
+                "title": {
+                  "value": "Open cloud image editor"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "name": {
+        "value": "Lumen Studio"
+      }
+    }
+  }
+}

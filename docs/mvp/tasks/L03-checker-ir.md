@@ -12,7 +12,7 @@ Validate a parsed spec and produce the normalized IR (defaults materialized, rul
 
 ## Deliverables
 - `pub struct CheckOptions { pub now: Option<DateTime<Utc>> }`
-- `pub fn check(src: &str, opts: &CheckOptions) -> CheckOutput { diagnostics, ir: Option<Ir> }` (IR only when no errors).
+- `pub fn check(src: &str, opts: &CheckOptions) -> CheckOutput { diagnostics, ir: Option<Ir> }` (IR only when no errors). If `parse` reports any error, return its diagnostics alone and run no semantic checks (SPEC-01 §5).
 - `Ir` serde types exactly as SPEC-01 §6 (`ir_version: 1`), JSON Schema `schema/ir.v1.json`.
 - Rule ids: `<goal>:r_<first 8 hex of sha256(formatted rule line)>`.
 - Limits analysis per SPEC-01 §6.1.
@@ -30,7 +30,7 @@ Validate a parsed spec and produce the normalized IR (defaults materialized, rul
 - [ ] **L03-T08** E306 holders > seats; E323 duplicate holder.
 - [ ] **L03-T09** E307 approve count 0 and count > seats; count == seats ok.
 - [ ] **L03-T10** E308: `0/3`, `4/3`, `1/0`, `0%`, `101%` error; `1/1`, `100%`, `1%` ok.
-- [ ] **L03-T11** E309 `usd 0`; E310 `2^53` micros + 1; E311 7 decimals (if not already caught by the parser, the checker must still report exactly one diagnostic).
+- [ ] **L03-T11** E309 `usd 0` from the checker; E310 `2^53` micros + 1 and E311 7 decimals come from the parser, and `check` reports exactly one diagnostic for each.
 - [ ] **L03-T12** E312 duplicate mandate (same agent twice; same `@handle` twice).
 - [ ] **L03-T13** E313 two `spend llm` lines in one mandate.
 - [ ] **L03-T14** E314 two rules with the same subject (identical, and same subject with different procedure).
@@ -50,6 +50,8 @@ Validate a parsed spec and produce the normalized IR (defaults materialized, rul
 - [ ] **L03-T28** Diagnostics sorted by span start; checking the same source twice yields byte-identical JSON.
 - [ ] **L03-T29** Every IR produced in this test suite validates against `schema/ir.v1.json` (dev-dependency `jsonschema`).
 - [ ] **L03-T30** Property: generated sources never panic the checker; result is IR xor ≥ 1 error.
+- [ ] **L03-T31** Parse errors stop semantic checks: `seats: 3x` gives only E103 (no E304); a steward circle with `holders: @A` gives only E106 (no E317); `fund: usd 9_007_199_255 / month from treasury` with `on_underfunded: pause` gives only E310 (no W404).
+- [ ] **L03-T32** E318: one mandate with `spend llm <= usd 300_000_000 / day` (×31 = $9.3 billion) errors on the goal; `usd 290_000_000 / day` does not; the same line excluded by a `rule spend llm requires …` (no threshold, deny) does not; 40 mandates (`@a1` … `@a40`) with three maximal day lines each give one E318 and no overflow or panic (the naive sum passes `u64::MAX` after 66 lines).
 
 ## Acceptance criteria
 - All tests pass; the JSON Schema is complete enough to reject an IR missing any required field (add one negative schema test).

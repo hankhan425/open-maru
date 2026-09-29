@@ -6,9 +6,17 @@
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
+pub mod ast;
+pub mod diag;
 mod error;
+pub mod lexer;
+pub mod parser;
+pub mod span;
 
+pub use diag::{Code, Diagnostic, Severity};
 pub use error::CoreError;
+pub use parser::{ParseOutput, parse};
+pub use span::{Pos, Span};
 
 use serde_json::{Map, Value};
 
