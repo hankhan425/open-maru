@@ -141,12 +141,14 @@ Parsing is error-tolerant: on a syntax error inside a block, the parser skips to
 
 The checker is pure: `check(source, opts) → {diagnostics, ir?}`. IR is returned only when there are no errors. `opts.now` (optional ISO timestamp) enables time-relative warnings; without it they are skipped so checking stays deterministic.
 
+Checking has two stages. The parser reports E1xx, E2xx, E310 and E311. If it reports any error, `check` returns those diagnostics alone: no semantic checks run and there is no IR. The parser leaves an item with an error out of the tree, so checking that tree would report the same mistake again (a malformed `seats` would also be a missing one, E304). Semantic checks (the other E3xx codes and all W4xx) run only on a source that parses without errors.
+
 | Code | Severity | Condition |
 |---|---|---|
-| E101 | error | Unexpected character |
-| E102 | error | Unterminated string |
-| E103 | error | Malformed number (underscores) |
-| E104 | error | Malformed duration |
+| E101 | error | Unexpected character, or unknown escape in a string (at the escape) |
+| E102 | error | Unterminated string (one that runs to end of file is not also reported as E202) |
+| E103 | error | Malformed number (underscores), or number too large |
+| E104 | error | Malformed duration, or duration too long |
 | E105 | error | Invalid date |
 | E106 | error | Invalid handle |
 | E107 | error | Invalid or reserved identifier |
@@ -164,8 +166,8 @@ The checker is pure: `check(source, opts) → {diagnostics, ir?}`. IR is returne
 | E307 | error | approve count < 1 or > seats |
 | E308 | error | Threshold out of range |
 | E309 | error | Money must be > 0 |
-| E310 | error | Money exceeds maximum |
-| E311 | error | Money has more than 6 decimal places |
+| E310 | error | Money exceeds maximum (reported by the parser) |
+| E311 | error | Money has more than 6 decimal places (reported by the parser) |
 | E312 | error | Two mandates for the same principal in a goal |
 | E313 | error | Two spend lines for the same category in a mandate |
 | E314 | error | Two rules with the same subject in a goal |

@@ -15,7 +15,7 @@ Turn source text into a typed AST with precise spans and trivia (comments), and 
 - `Diagnostic {code, severity, message, span, notes}` + `serde` serialization matching SPEC-01 §5.
 - Lexer producing tokens with spans; keywords per SPEC-01 §2.
 - Hand-written recursive-descent parser covering every production in SPEC-01 §3, with recovery (skip to next item keyword or matching `}`).
-- AST types mirroring the grammar; durations keep `{value, unit}`; money literals keep their source text and parsed micros; comments attached as leading/trailing trivia.
+- AST types mirroring the grammar; durations keep `{value, unit}`; money literals keep their exact micros (the text as written is the source at the span; OQ-2); comments attached as leading/trailing trivia.
 - `pub fn parse(src: &str) -> ParseOutput { file: Option<ast::File>, diagnostics: Vec<Diagnostic> }`.
 - Test-only naive printer for property tests.
 

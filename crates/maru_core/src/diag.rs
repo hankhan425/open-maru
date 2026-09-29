@@ -39,10 +39,10 @@ macro_rules! codes {
 }
 
 codes! {
-    E101: "Unexpected character.",
-    E102: "Unterminated string.",
-    E103: "Malformed number (underscores).",
-    E104: "Malformed duration.",
+    E101: "Unexpected character, or unknown escape in a string (at the escape).",
+    E102: "Unterminated string (one that runs to end of file is not also reported as E202).",
+    E103: "Malformed number (underscores), or number too large.",
+    E104: "Malformed duration, or duration too long.",
     E105: "Invalid date.",
     E106: "Invalid handle.",
     E107: "Invalid or reserved identifier.",
@@ -60,8 +60,8 @@ codes! {
     E307: "approve count < 1 or > seats.",
     E308: "Threshold out of range.",
     E309: "Money must be > 0.",
-    E310: "Money exceeds maximum.",
-    E311: "Money has more than 6 decimal places.",
+    E310: "Money exceeds maximum (reported by the parser).",
+    E311: "Money has more than 6 decimal places (reported by the parser).",
     E312: "Two mandates for the same principal in a goal.",
     E313: "Two spend lines for the same category in a mandate.",
     E314: "Two rules with the same subject in a goal.",

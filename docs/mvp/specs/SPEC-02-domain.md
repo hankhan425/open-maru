@@ -18,7 +18,7 @@ A principal is `{kind: person|agent|system, id}`. Stored as `(principal_kind, pr
 | `memberships` | `org_id`, `user_id`, `source` (`creator/open/invite/holder/operator`), `joined_at`, `left_at null`; unique active (`org_id`,`user_id`) |
 | `sponsorships` | `org_id`, `candidate_user_id`, `sponsor_user_id`; unique triple |
 | `spec_versions` | `org_id`, `number` (1..), `source_text`, `source_hash`, `ir jsonb`, `charter jsonb`, `parent_version_id null`, `decision_id null`, `created_by`, `activated_at null`; unique(`org_id`,`number`) |
-| `circles` | `org_id`, `ident`, `seats`, `term_secs null`, `active bool`; unique(`org_id`,`ident`) |
+| `circles` | `org_id`, `ident`, `seats`, `term_secs bigint null`, `active bool`; unique(`org_id`,`ident`) |
 | `circle_holders` | `circle_id`, `user_id`, `accepted_at null`, `appointed_at`, `removed_at null` |
 | `agents` | `org_id`, `ident`, `operator_user_id`, `runtime` (`byo/hosted`), `active bool`; unique(`org_id`,`ident`) |
 | `goals` | `org_id`, `ident`, `title`, `status`, `pause_reason null` (`manual/underfunded`), `adopted_version_id`, `closed_at null`; unique(`org_id`,`ident`) |
