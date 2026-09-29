@@ -57,6 +57,7 @@ defmodule Openmaru.MixProject do
       {:oban, "~> 2.20"},
       {:open_api_spex, "~> 3.21"},
       {:typeid_elixir, "~> 1.1"},
+      {:rustler, "~> 0.38.0", runtime: false},
       {:mox, "~> 1.2", only: :test},
       {:stream_data, "~> 1.1", only: [:dev, :test]},
       {:credo, "~> 1.7", only: [:dev, :test], runtime: false},

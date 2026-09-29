@@ -17,6 +17,11 @@ config :openmaru, Openmaru.Repo,
   migration_foreign_key: [type: :uuid],
   migration_timestamps: [type: :utc_datetime_usec]
 
+# Builds maru_nif with the `test-helpers` cargo feature (Openmaru.Lang.panic_test/0) for
+# tests. Rustler copies the library to the shared priv/native/, so dev must build the
+# same artifact or a dev compile would replace the test build. Never enabled in prod.
+config :openmaru, nif_test_helpers: config_env() in [:dev, :test]
+
 config :openmaru, Oban,
   engine: Oban.Engines.Basic,
   repo: Openmaru.Repo,

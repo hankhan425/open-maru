@@ -6,14 +6,17 @@ defmodule Openmaru.LangTest do
   @root Path.expand("../../../..", __DIR__)
   @vectors_path Path.join(@root, "crates/maru_core/tests/vectors/echo.json")
   @cargo_toml Path.join(@root, "Cargo.toml")
-  @external_resource @vectors_path
-  @external_resource @cargo_toml
 
-  @vectors @vectors_path |> File.read!() |> Jason.decode!()
+  setup_all do
+    {:ok, vectors: @vectors_path |> File.read!() |> Jason.decode!()}
+  end
 
   defp rust_version do
     [_, version] =
-      Regex.run(~r/\[workspace\.package\][^\[]*?^version\s*=\s*"([^"]+)"/ms, File.read!(@cargo_toml))
+      Regex.run(
+        ~r/\[workspace\.package\][^\[]*?^version\s*=\s*"([^"]+)"/ms,
+        File.read!(@cargo_toml)
+      )
 
     version
   end
@@ -22,10 +25,12 @@ defmodule Openmaru.LangTest do
     assert Lang.version() == rust_version()
   end
 
-  test "T03-T04 every echo.json vector through the NIF produces the exact expected output" do
-    assert @vectors != []
+  test "T03-T04 every echo.json vector through the NIF produces the exact expected output", %{
+    vectors: vectors
+  } do
+    assert vectors != []
 
-    for %{"input" => input, "output" => output} <- @vectors do
+    for %{"input" => input, "output" => output} <- vectors do
       assert Lang.echo_json(input) == {:ok, output}, "input: #{inspect(input)}"
     end
   end
@@ -37,13 +42,15 @@ defmodule Openmaru.LangTest do
     end
   end
 
-  test "T03-T05 50 concurrent processes calling echo_json/1 all get correct results" do
-    expected = Enum.map(@vectors, &{:ok, &1["output"]})
+  test "T03-T05 50 concurrent processes calling echo_json/1 all get correct results", %{
+    vectors: vectors
+  } do
+    expected = Enum.map(vectors, &{:ok, &1["output"]})
 
     results =
       1..50
       |> Task.async_stream(
-        fn _ -> Enum.map(@vectors, &Lang.echo_json(&1["input"])) end,
+        fn _ -> Enum.map(vectors, &Lang.echo_json(&1["input"])) end,
         max_concurrency: 50,
         ordered: false,
         timeout: 30_000
