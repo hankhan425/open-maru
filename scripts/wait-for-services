@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+# Wait until the compose services (Postgres + MinIO) are ready. Fails after TIMEOUT seconds (default 60).
+# Usage: scripts/wait-for-services
+set -euo pipefail
+
+cd "$(dirname "${BASH_SOURCE[0]}")/.."
+timeout="${TIMEOUT:-60}"
+deadline=$((SECONDS + timeout))
+
+pg_ready() {
+  local db
+  for db in openmaru_dev openmaru_test; do
+    docker compose exec -T postgres psql -U postgres -d "$db" -tAc 'select 1' >/dev/null 2>&1 || return 1
+  done
+}
+minio_ready() { curl -fsS http://localhost:9000/minio/health/ready >/dev/null 2>&1; }
+bucket_ready() {
+  local id
+  id="$(docker compose ps -aq minio-setup 2>/dev/null)" || return 1
+  [ -n "$id" ] && [ "$(docker inspect -f '{{.State.Status}} {{.State.ExitCode}}' "$id")" = "exited 0" ]
+}
+
+for check in pg_ready minio_ready bucket_ready; do
+  until "$check"; do
+    if [ "$SECONDS" -ge "$deadline" ]; then
+      echo "timed out after ${timeout}s waiting for $check" >&2
+      docker compose ps -a >&2 || true
+      exit 1
+    fi
+    sleep 1
+  done
+  echo "$check: ok"
+done

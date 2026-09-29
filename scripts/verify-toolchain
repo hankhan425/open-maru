@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+# Assert toolchain pins exist and that CI reads them instead of hardcoding versions.
+# Usage: scripts/verify-toolchain [repo-root]
+set -euo pipefail
+
+root="${1:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+cd "$root"
+
+status=0
+fail() { echo "error: $1" >&2; status=1; }
+
+if [ -f .tool-versions ]; then
+  for t in erlang elixir nodejs pnpm; do
+    grep -Eq "^${t} [^ ]+" .tool-versions || fail ".tool-versions has no pin for $t"
+  done
+else
+  fail ".tool-versions missing"
+fi
+
+if [ -f rust-toolchain.toml ]; then
+  grep -q '^channel' rust-toolchain.toml || fail "rust-toolchain.toml has no channel"
+  grep -q 'wasm32-unknown-unknown' rust-toolchain.toml || fail "rust-toolchain.toml lacks wasm32-unknown-unknown target"
+  grep -q 'rustfmt' rust-toolchain.toml || fail "rust-toolchain.toml lacks rustfmt"
+  grep -q 'clippy' rust-toolchain.toml || fail "rust-toolchain.toml lacks clippy"
+else
+  fail "rust-toolchain.toml missing"
+fi
+
+ci=.github/workflows/ci.yml
+if [ -f "$ci" ]; then
+  grep -q '\.tool-versions' "$ci" || fail "CI does not read .tool-versions"
+  # No literal version inputs to setup actions (must come from pins).
+  if grep -Eq '^\s*(node-version|otp-version|elixir-version|toolchain|pnpm-version|version):\s*["'\'']?[0-9v]' "$ci"; then
+    fail "CI hardcodes a tool version:"
+    grep -nE '^\s*(node-version|otp-version|elixir-version|toolchain|pnpm-version|version):\s*["'\'']?[0-9v]' "$ci" >&2
+  fi
+  if grep -Eq '^\s*toolchain:' "$ci"; then fail "CI hardcodes a Rust toolchain; use rust-toolchain.toml"; fi
+else
+  fail "$ci missing"
+fi
+
+if [ "$status" -eq 0 ]; then echo "toolchain pins ok"; fi
+exit "$status"
