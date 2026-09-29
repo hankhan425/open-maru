@@ -10,6 +10,12 @@ defmodule Openmaru.MixProject do
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
       deps: deps(),
+      dialyzer: [
+        plt_local_path: "priv/plts",
+        plt_core_path: "priv/plts",
+        plt_add_apps: [:mix, :ex_unit],
+        flags: [:error_handling, :extra_return, :missing_return]
+      ],
       listeners: [Phoenix.CodeReloader]
     ]
   end

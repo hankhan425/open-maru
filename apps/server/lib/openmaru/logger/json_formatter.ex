@@ -20,7 +20,7 @@ defmodule Openmaru.Logger.JSONFormatter do
   def check_config(_config), do: :ok
 
   @doc "Formats a `:logger` event as a JSON line."
-  @spec format(:logger.log_event(), term()) :: iodata()
+  @spec format(:logger.log_event(), term()) :: iolist()
   def format(%{level: level, msg: msg, meta: meta}, _config) do
     meta = Scrubber.scrub_meta(meta)
 
@@ -83,9 +83,8 @@ defmodule Openmaru.Logger.JSONFormatter do
   defp jsonable(value) when is_list(value) do
     cond do
       value != [] and Keyword.keyword?(value) -> value |> Map.new() |> jsonable()
-      List.ascii_printable?(value) and value != [] -> List.to_string(value)
-      proper_list?(value) -> Enum.map(value, &jsonable/1)
-      true -> inspect(value)
+      value != [] and List.ascii_printable?(value) -> List.to_string(value)
+      true -> jsonable_list(value)
     end
   end
 
@@ -95,7 +94,8 @@ defmodule Openmaru.Logger.JSONFormatter do
   defp key(k) when is_atom(k), do: Atom.to_string(k)
   defp key(k), do: inspect(k)
 
-  defp proper_list?([]), do: true
-  defp proper_list?([_ | tail]), do: proper_list?(tail)
-  defp proper_list?(_), do: false
+  # An improper tail becomes its inspected form as the last element.
+  defp jsonable_list([head | tail]), do: [jsonable(head) | jsonable_list(tail)]
+  defp jsonable_list([]), do: []
+  defp jsonable_list(tail), do: [inspect(tail)]
 end

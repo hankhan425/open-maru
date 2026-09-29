@@ -46,8 +46,8 @@ test_T01_T02_verify_layout_fails_when_tasks_glob_empty() {
 test_T01_T03_just_check_passes_without_manifests() {
   command -v just >/dev/null || { echo "just not installed"; exit 1; }
   local tmp; tmp="$(copy_tree)"
-  [ ! -e "$tmp/Cargo.toml" ] && [ ! -e "$tmp/apps/server/mix.exs" ] && [ ! -e "$tmp/web/package.json" ] \
-    || { echo "manifests present"; exit 1; }
+  # Later tasks add the manifests; remove them to model a clone from before any stack exists.
+  rm -f "$tmp/Cargo.toml" "$tmp/apps/server/mix.exs" "$tmp/web/package.json"
   (cd "$tmp" && just check)
 }
 

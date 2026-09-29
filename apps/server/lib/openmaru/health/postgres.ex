@@ -3,11 +3,13 @@ defmodule Openmaru.Health.Postgres do
 
   @behaviour Openmaru.Health
 
+  alias Ecto.Adapters.SQL
+
   @timeout 2_000
 
   @impl Openmaru.Health
   def check_db do
-    case Ecto.Adapters.SQL.query(Openmaru.Repo, "SELECT 1", [], timeout: @timeout) do
+    case SQL.query(Openmaru.Repo, "SELECT 1", [], timeout: @timeout) do
       {:ok, _result} -> :ok
       {:error, error} -> {:error, error}
     end

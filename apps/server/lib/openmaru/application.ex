@@ -5,6 +5,8 @@ defmodule Openmaru.Application do
 
   use Application
 
+  alias Openmaru.Logger.Scrubber
+
   @impl true
   def start(_type, _args) do
     install_log_scrubber()
@@ -27,10 +29,7 @@ defmodule Openmaru.Application do
 
   # SPEC-09 §3: every handler sees scrubbed metadata and reports.
   defp install_log_scrubber do
-    case :logger.add_primary_filter(
-           :openmaru_scrubber,
-           {&Openmaru.Logger.Scrubber.filter/2, []}
-         ) do
+    case :logger.add_primary_filter(:openmaru_scrubber, {&Scrubber.filter/2, []}) do
       :ok -> :ok
       {:error, {:already_exist, _}} -> :ok
     end

@@ -3,13 +3,15 @@ defmodule OpenmaruWeb.ApiSpecTest do
 
   import OpenApiSpex.TestAssertions
 
+  alias OpenApiSpex.OpenApi.Decode
+
   test "T02-T12 /api/v1/openapi.json is served and passes OpenApiSpex validation", %{conn: conn} do
     json = conn |> get("/api/v1/openapi.json") |> json_response(200)
 
     assert json["openapi"] =~ ~r/\A3\.\d+\.\d+\z/
     assert %{"title" => _, "version" => _} = json["info"]
 
-    spec = OpenApiSpex.OpenApi.Decode.decode(json)
+    spec = Decode.decode(json)
     assert %OpenApiSpex.OpenApi{} = spec
 
     for {path, item} <- spec.paths,

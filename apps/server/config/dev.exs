@@ -22,7 +22,8 @@ config :openmaru, OpenmaruWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}],
   check_origin: false,
   code_reloader: true,
-  debug_errors: true,
+  # API-only: render the JSON error envelope in dev too.
+  debug_errors: false,
   secret_key_base: "8/9HuIICal+b5FW3gsshHu9QRtG8xsAvi6HMiN7OcVcxQXlzEYleFUkaStFN5gJb",
   watchers: []
 
