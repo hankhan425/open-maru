@@ -153,10 +153,22 @@ fn l01_t05_valid_numbers() {
     }
     let m = per_request(&mandate_with("      per_request <= usd 12.50"));
     assert_eq!(m.micros, 12_500_000);
-    assert_eq!(m.text, "12.50");
     let m = per_request(&mandate_with("      per_request <= usd 12_000"));
     assert_eq!(m.micros, 12_000_000_000);
-    assert_eq!(m.text, "12_000");
+}
+
+// L01 extra (OQ-2): money spelled differently but equal in value gives equal ASTs, so the
+// formatter's AST-preservation property holds with only spans and comments ignored.
+#[test]
+fn l01_money_spellings_of_one_value_give_equal_asts() {
+    for (a, b) in [("12000", "12_000"), ("12.5", "12.50"), ("7", "7.000000")] {
+        let ast = |n: &str| {
+            ast_json(&parse_ok(&mandate_with(&format!(
+                "      per_request <= usd {n}"
+            ))))
+        };
+        assert_eq!(ast(a), ast(b), "usd {a} vs usd {b}");
+    }
 }
 
 // L01-T05

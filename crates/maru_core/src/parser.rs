@@ -474,10 +474,10 @@ impl<'a> Parser<'a> {
             TokenKind::Word { numeric: true, .. } => return Err(self.malformed_number()),
             _ => return Err(self.expected("an amount")),
         };
-        let text = self.source(span).to_string();
         if frac.len() > 6 {
             let message = format!(
-                "`{text}` has {} decimal places; money allows at most 6",
+                "`{}` has {} decimal places; money allows at most 6",
+                self.source(span),
                 frac.len()
             );
             return Err(self.malformed(Code::E311, message));
@@ -497,13 +497,13 @@ impl<'a> Parser<'a> {
             .filter(|m| *m <= MAX_MONEY_MICROS);
         let Some(micros) = micros else {
             let message = format!(
-                "`{text}` exceeds the maximum amount of 9007199254.740991 (2^53 − 1 micro-USD)"
+                "`{}` exceeds the maximum amount of 9007199254.740991 (2^53 − 1 micro-USD)",
+                self.source(span)
             );
             return Err(self.malformed(Code::E310, message));
         };
         self.bump();
         Ok(Money {
-            text,
             micros,
             span: usd.to(span),
         })

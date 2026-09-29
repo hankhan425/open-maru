@@ -187,7 +187,14 @@ pub fn handle(h: &Handle) -> String {
 }
 
 pub fn money(m: &Money) -> String {
-    format!("usd {}", m.text)
+    let whole = m.micros / 1_000_000;
+    let frac = m.micros % 1_000_000;
+    if frac == 0 {
+        format!("usd {whole}")
+    } else {
+        let frac = format!("{frac:06}");
+        format!("usd {whole}.{}", frac.trim_end_matches('0'))
+    }
 }
 
 pub fn signed(s: &Signed) -> String {

@@ -156,8 +156,7 @@ expression: ast_json(&f)
                       "node": {
                         "fund": {
                           "amount": {
-                            "micros": 12000000000,
-                            "text": "12_000"
+                            "micros": 12000000000
                           },
                           "schedule": {
                             "every": "month"
@@ -205,8 +204,7 @@ expression: ast_json(&f)
                                   "spend": {
                                     "category": "llm",
                                     "limit": {
-                                      "micros": 4000000000,
-                                      "text": "4_000"
+                                      "micros": 4000000000
                                     },
                                     "period": "month"
                                   }
@@ -217,8 +215,7 @@ expression: ast_json(&f)
                                   "spend": {
                                     "category": "compute",
                                     "limit": {
-                                      "micros": 1000000000,
-                                      "text": "1_000"
+                                      "micros": 1000000000
                                     },
                                     "period": "month"
                                   }
@@ -227,8 +224,7 @@ expression: ast_json(&f)
                               {
                                 "node": {
                                   "per_request": {
-                                    "micros": 25000000,
-                                    "text": "25"
+                                    "micros": 25000000
                                   }
                                 }
                               },
@@ -280,8 +276,7 @@ expression: ast_json(&f)
                                   "spend": {
                                     "category": "expense",
                                     "limit": {
-                                      "micros": 500000000,
-                                      "text": "500"
+                                      "micros": 500000000
                                     },
                                     "period": "month"
                                   }
@@ -334,8 +329,7 @@ expression: ast_json(&f)
                               "spend": {
                                 "category": null,
                                 "over": {
-                                  "micros": 500000000,
-                                  "text": "500"
+                                  "micros": 500000000
                                 }
                               }
                             }

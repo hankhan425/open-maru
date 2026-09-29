@@ -560,10 +560,12 @@ pub struct Int {
 }
 
 /// A money literal, `usd X`.
+///
+/// Only the value is kept, so `usd 12000` and `usd 12_000` are equal, as the formatter's
+/// AST-preservation property requires (SPEC-01 §7). The text as written is the source at
+/// `span`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct Money {
-    /// The number exactly as written after `usd`, e.g. `12_000` or `0.50`.
-    pub text: String,
     /// The exact value in micro-USD (at most 6 decimals and at most
     /// [`MAX_MONEY_MICROS`], otherwise the parser reports E311/E310).
     pub micros: u64,

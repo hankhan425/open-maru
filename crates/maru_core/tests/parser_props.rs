@@ -194,42 +194,14 @@ fn int() -> impl Strategy<Value = Int> {
     })
 }
 
-/// Groups digits with `_` every three from the right when `group` is set.
-fn digits_text(n: u64, group: bool) -> String {
-    let s = n.to_string();
-    if !group {
-        return s;
-    }
-    let mut out = String::new();
-    for (i, c) in s.chars().enumerate() {
-        if i > 0 && (s.len() - i) % 3 == 0 {
-            out.push('_');
-        }
-        out.push(c);
-    }
-    out
-}
-
 fn money() -> impl Strategy<Value = Money> {
     (
         0u64..=9_007_199_253,
-        any::<bool>(),
-        prop::option::of("[0-9]{1,6}"),
+        prop_oneof![Just(0u64), 0u64..1_000_000],
     )
-        .prop_map(|(whole, group, frac)| {
-            let mut text = digits_text(whole, group);
-            let mut micros = whole * 1_000_000;
-            if let Some(f) = &frac {
-                text.push('.');
-                text.push_str(f);
-                let padded = format!("{f:0<6}");
-                micros += padded.parse::<u64>().expect("digits");
-            }
-            Money {
-                text,
-                micros,
-                span: NO_SPAN,
-            }
+        .prop_map(|(whole, frac)| Money {
+            micros: whole * 1_000_000 + frac,
+            span: NO_SPAN,
         })
 }
 
