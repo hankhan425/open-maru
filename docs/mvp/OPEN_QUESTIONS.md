@@ -31,3 +31,32 @@ ARCHITECTURE > PRD.
   401 → `unauthenticated`, 403 → `forbidden`, 404 → `not_found`, 422 → `validation_failed`,
   429 → `rate_limited`, other 4xx → `invalid_request`, 5xx → `internal_error`, keeping the HTTP status.
 - **Resolution:**
+
+### OQ-2: Money source text in the AST vs. AST equality in L02
+- **Task:** L01
+- **Status:** open
+- **Conflict:** L01 (Deliverables) requires money literals to keep their source text, so
+  `usd 12000` and `usd 12_000` give different ASTs. L02-T02 calls `lumen.messy.maru` (with
+  `usd 12000`) "same AST as lumen", and L02-T10 compares `parse(format(x))` with `parse(x)`
+  "ignoring spans and trivia"; formatting changes that text.
+- **Options:** (a) treat `Money.text` as trivia in L02's comparisons; (b) drop the text from
+  the AST and keep only micros; (c) normalize the text in the parser.
+- **Chosen (interim):** (a). `ast::Money` has `text` (as written) and exact `micros`; L02
+  compares with spans, comments and `Money.text` removed. Integers and metric values
+  (`Int`, `Signed`) store digits without `_`, so they already compare equal.
+- **Resolution:**
+
+### OQ-3: Lexical cases SPEC-01 §2/§5 do not assign a code to
+- **Task:** L01
+- **Status:** open
+- **Conflict:** SPEC-01 does not say which code covers: an unknown string escape (`\t`); an
+  integer too large for 64 bits in a count position (`seats: 99999999999999999999999`); a
+  money literal above 2^53 − 1 micros (E310 is listed with the checker's codes); a
+  duration whose seconds overflow; an unterminated string that runs to end of file (E102
+  and E202 would both apply).
+- **Options:** assign codes per case, or add new codes.
+- **Chosen (interim):** unknown escape → E101 at the escape; oversized integer → E103;
+  money over the maximum → E310 from the parser (the item is dropped, so the checker never
+  sees it and cannot report it twice); oversized duration → E104; E102 at end of file
+  suppresses E202. No new codes.
+- **Resolution:**
