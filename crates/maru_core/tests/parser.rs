@@ -777,11 +777,23 @@ fn l01_comment_inside_an_item_is_kept_as_leading() {
     assert_eq!(items.last().expect("rule").leading[0].text, "# inner");
 }
 
-// L01 extra: integers too large for u64 are malformed numbers.
+// L01 extra (OQ-4): whole numbers above 2^31 − 1 are malformed numbers.
 #[test]
-fn l01_integer_overflow_is_e103() {
+fn l01_integer_above_maximum_is_e103() {
+    let f = parse_ok(&circle_with("    seats: 2_147_483_647"));
+    assert!(matches!(
+        circle(&f, "c2").body.items[0].node,
+        CircleItem::Seats(Int { value: MAX_INT, .. })
+    ));
+    for n in ["2_147_483_648", "99999999999999999999999"] {
+        assert_single(&circle_with(&format!("    seats: {n}")), Code::E103, n);
+    }
+    assert_single(
+        &org_with("  amend: vote(core, 1/2147483648)"),
+        Code::E103,
+        "2147483648",
+    );
     let n = "99999999999999999999999";
-    assert_single(&circle_with(&format!("    seats: {n}")), Code::E103, n);
     // …but a metric value keeps its digits.
     let f = parse_ok(&goal_with(&format!("    success: metric(wau) >= {n}")));
     assert!(matches!(last_goal_item(&f), GoalItem::Success(s) if s.value.int == n));

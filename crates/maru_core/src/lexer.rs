@@ -6,7 +6,7 @@
 //! vs. a malformed number or duration) are lexed as [`TokenKind::Word`] and classified by
 //! the parser.
 
-use crate::ast::{Comment, DurationUnit};
+use crate::ast::{Comment, DurationUnit, MAX_DURATION_SECS};
 use crate::diag::{Code, Diagnostic};
 use crate::span::{Pos, Span};
 
@@ -558,14 +558,13 @@ impl Lexer<'_> {
             .get(..text.len().saturating_sub(1))
             .and_then(int_digits);
         if let (Some(unit), Some(count)) = (unit, count) {
-            match count
-                .parse::<u64>()
-                .ok()
-                .filter(|v| v.checked_mul(unit.secs()).is_some())
-            {
+            match count.parse::<u64>().ok().filter(|v| {
+                v.checked_mul(unit.secs())
+                    .is_some_and(|secs| secs <= MAX_DURATION_SECS)
+            }) {
                 Some(value) => self.push(TokenKind::Duration { value, unit }, start),
                 None => {
-                    let message = format!("duration `{text}` is too large");
+                    let message = format!("duration `{text}` is too large; the maximum is 100y");
                     let span = Span::new(start, self.pos);
                     self.error(Code::E104, message, span, start);
                 }

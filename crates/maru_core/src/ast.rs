@@ -16,6 +16,14 @@ use crate::span::Span;
 /// The largest money literal, in micro-USD (2^53 − 1; SPEC-01 §4.8).
 pub const MAX_MONEY_MICROS: u64 = 9_007_199_254_740_991;
 
+/// The largest whole number in a count position (seats, sponsors, approval counts,
+/// thresholds): 2^31 − 1, so it fits a Postgres `integer` and a JS number (interim, OQ-4).
+pub const MAX_INT: u64 = 2_147_483_647;
+
+/// The longest duration, in seconds: 100 years of 365 days (interim, OQ-4). Deadlines
+/// computed from it stay well inside Elixir's and Postgres's date ranges.
+pub const MAX_DURATION_SECS: u64 = 100 * 31_536_000;
+
 /// A parsed `.maru` file: exactly one org.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct File {
@@ -598,8 +606,8 @@ pub struct Duration {
 }
 
 impl Duration {
-    /// Length in seconds (`value × unit`), saturating; the parser rejects literals whose
-    /// seconds overflow `u64` (E104).
+    /// Length in seconds (`value × unit`), saturating; the parser rejects literals longer
+    /// than [`MAX_DURATION_SECS`] (E104).
     pub fn secs(&self) -> u64 {
         self.value.saturating_mul(self.unit.secs())
     }

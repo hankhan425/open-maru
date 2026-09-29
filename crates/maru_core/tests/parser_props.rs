@@ -188,7 +188,7 @@ fn string() -> impl Strategy<Value = Str> {
 }
 
 fn int() -> impl Strategy<Value = Int> {
-    prop_oneof![0u64..100, any::<u64>()].prop_map(|value| Int {
+    prop_oneof![0u64..100, 0u64..=MAX_INT].prop_map(|value| Int {
         value,
         span: NO_SPAN,
     })
@@ -220,21 +220,21 @@ fn signed() -> impl Strategy<Value = Signed> {
 }
 
 fn duration() -> impl Strategy<Value = Duration> {
-    (
-        0u64..1_000_000,
-        prop::sample::select(vec![
-            DurationUnit::Minutes,
-            DurationUnit::Hours,
-            DurationUnit::Days,
-            DurationUnit::Weeks,
-            DurationUnit::Years,
-        ]),
-    )
-        .prop_map(|(value, unit)| Duration {
+    prop::sample::select(vec![
+        DurationUnit::Minutes,
+        DurationUnit::Hours,
+        DurationUnit::Days,
+        DurationUnit::Weeks,
+        DurationUnit::Years,
+    ])
+    .prop_flat_map(|unit| {
+        let max = MAX_DURATION_SECS / unit.secs();
+        prop_oneof![0u64..=max.min(999), 0u64..=max].prop_map(move |value| Duration {
             value,
             unit,
             span: NO_SPAN,
         })
+    })
 }
 
 fn date() -> impl Strategy<Value = Date> {

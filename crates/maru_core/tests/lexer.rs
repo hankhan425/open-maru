@@ -270,6 +270,29 @@ fn l01_t07_malformed_durations_are_e104() {
     }
 }
 
+// L01 extra (OQ-4): durations longer than 100 years are malformed durations.
+#[test]
+fn l01_duration_above_maximum_is_e104() {
+    for d in ["100y", "36500d", "876000h", "52560000m", "5214w"] {
+        let src = circle_with(&format!("    seats: 1\n    term: {d}"));
+        assert!(circle_term(&src).secs() <= MAX_DURATION_SECS, "{d}");
+    }
+    for d in [
+        "101y",
+        "36501d",
+        "876001h",
+        "52560001m",
+        "5215w",
+        "99999999999999999999y",
+    ] {
+        assert_single(
+            &circle_with(&format!("    seats: 1\n    term: {d}")),
+            Code::E104,
+            d,
+        );
+    }
+}
+
 fn expires(src: &str) -> Date {
     let f = parse_ok(src);
     match mandate_items(&f)[0] {

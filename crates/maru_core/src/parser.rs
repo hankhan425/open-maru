@@ -407,12 +407,15 @@ impl<'a> Parser<'a> {
         let span = self.span();
         match self.kind() {
             TokenKind::Int(digits) => match digits.parse::<u64>() {
-                Ok(value) => {
+                Ok(value) if value <= MAX_INT => {
                     self.bump();
                     Ok(Int { value, span })
                 }
-                Err(_) => {
-                    let message = format!("number `{}` is too large", self.source(span));
+                _ => {
+                    let message = format!(
+                        "number `{}` is too large; the maximum is 2_147_483_647",
+                        self.source(span)
+                    );
                     Err(self.malformed(Code::E103, message))
                 }
             },
