@@ -26,24 +26,86 @@ fn no_panic(src: &str) {
     }
 }
 
+/// Punctuation and valid/invalid literal fragments for [`token_soup`]. Sampled from a
+/// fixed list because regex strategies are slow in debug builds.
+const FRAGMENTS: &[&str] = &[
+    "{",
+    "}",
+    "(",
+    ")",
+    ":",
+    ",",
+    "/",
+    "%",
+    "-",
+    "->",
+    "<=",
+    ">=",
+    "<",
+    ">",
+    "==",
+    "=",
+    ".",
+    "@",
+    "\"",
+    "\\",
+    "#",
+    "\n",
+    " ",
+    "\r\n",
+    "$",
+    ";",
+    "é",
+    "🦀",
+    "a",
+    "core",
+    "x_1",
+    "aB",
+    "A",
+    "_a",
+    "_12",
+    "0",
+    "7",
+    "12_000",
+    "1_0",
+    "12__000",
+    "12_",
+    "1._5",
+    "12.50",
+    "1.1234567",
+    "99999999999999999999999",
+    "30m",
+    "7d",
+    "0d",
+    "7mo",
+    "7x",
+    "1.5d",
+    "2027-06-30",
+    "2027-6-30",
+    "2027-02-29",
+    "10-5",
+    "@mina",
+    "@a-b_c",
+    "@a",
+    "@Mina",
+    "@-a",
+    "\"str\"",
+    "\"unterminated",
+    "\"a\\nb\"",
+    "\"bad\\t\"",
+    "\"x\ny\"",
+    "# comment\n",
+    "#\n",
+];
+
 /// Keywords, punctuation and literal fragments glued together at random.
 fn token_soup() -> impl Strategy<Value = String> {
     let piece = prop_oneof![
-        prop::sample::select(Keyword::ALL).prop_map(|k| k.as_str().to_string()),
-        prop::sample::select(vec![
-            "{", "}", "(", ")", ":", ",", "/", "%", "-", "->", "<=", ">=", "<", ">", "==", "=",
-            ".", "@", "\"", "\\", "#", "\n", " ", "\r\n", "$", ";", "é", "🦀",
-        ])
-        .prop_map(str::to_string),
-        "[a-zA-Z_][a-zA-Z0-9_]{0,6}",
-        "[0-9_]{1,6}(\\.[0-9_]{0,8})?[a-z]{0,2}",
-        "[0-9]{1,4}-[0-9]{1,2}-[0-9]{1,2}",
-        "@[a-zA-Z0-9_-]{0,8}",
-        "\"[a-z \\\\\"n]{0,6}\"?",
-        "#[^\n]{0,8}\n",
+        prop::sample::select(Keyword::ALL).prop_map(Keyword::as_str),
+        prop::sample::select(FRAGMENTS),
     ];
-    prop::collection::vec((piece, prop::sample::select(vec!["", " ", "\n"])), 0..120)
-        .prop_map(|parts| parts.into_iter().map(|(p, s)| p + s).collect())
+    prop::collection::vec((piece, prop::sample::select(&["", " ", "\n"][..])), 0..120)
+        .prop_map(|parts| parts.into_iter().flat_map(|(p, s)| [p, s]).collect())
 }
 
 /// `lumen.maru` with a few random character edits.
