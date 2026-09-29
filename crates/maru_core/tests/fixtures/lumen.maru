@@ -1,0 +1,43 @@
+# Lumen Studio — an open cloud image editor
+org "Lumen Studio" {
+  purpose "Build and maintain an open, browser-based image editor."
+  members: invite(sponsors: 1)
+  amend: vote(core, 2/3) within 7d else deny
+
+  circle core {
+    seats: 3
+    term: 1y
+    holders: @mina, @jo
+  }
+
+  agent builder {
+    operator: @mina
+    runtime: hosted
+  }
+
+  goal editor "Open cloud image editor" {
+    steward: core
+    purpose "Ship a usable editor with layers, masks and export."
+    fund: usd 12_000 / month from treasury
+    on_underfunded: pause
+    on_close: return treasury
+    success: metric(weekly_active_users) >= 10_000 by 2027-06-30
+
+    mandate builder {
+      spend llm <= usd 4_000 / month
+      spend compute <= usd 1_000 / month
+      per_request <= usd 25
+      can: claim_tasks, post_evidence, report_metric(weekly_active_users)
+      expires: 2027-01-01
+    }
+
+    mandate @jo {
+      spend expense <= usd 500 / month
+      can: claim_tasks, create_tasks, post_evidence
+    }
+
+    rule spend > usd 500 requires approve(core, 1) within 48h else deny
+    rule spend expense requires approve(core, 1) within 7d else deny
+    rule close requires vote(core, 2/3) within 7d else deny
+  }
+}

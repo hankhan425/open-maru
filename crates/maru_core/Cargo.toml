@@ -12,12 +12,17 @@ default = ["authz"]
 authz = []
 
 [dependencies]
+serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-serde.workspace = true
 proptest.workspace = true
+insta.workspace = true
+
+[[bench]]
+name = "parse"
+harness = false
 
 [lints]
 workspace = true
