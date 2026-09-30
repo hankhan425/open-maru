@@ -468,6 +468,21 @@ defmodule OpenmaruWeb.Auth.PasskeyControllerTest do
       assert Repo.get_by!(Passkey, credential_id: auth.credential_id).sign_count == 0
     end
 
+    test "C01-T04 credentials and OAuth codes are filtered from parameter logs" do
+      filtered =
+        Phoenix.Logger.filter_values(%{
+          "challenge_id" => "c",
+          "credential" => %{"response" => %{"signature" => "sig"}},
+          "code" => "oauth-code"
+        })
+
+      assert filtered == %{
+               "challenge_id" => "c",
+               "credential" => "[FILTERED]",
+               "code" => "[FILTERED]"
+             }
+    end
+
     test "C01-T04 login options carry a persisted challenge and no allow list", %{conn: conn} do
       conn = post(conn, ~p"/api/v1/auth/passkey/login/options", %{})
       body = json_response(conn, 200)

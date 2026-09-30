@@ -65,6 +65,10 @@ config :logger, :default_formatter,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# SPEC-09 §3: redact credentials from Phoenix's request parameter logs (keys containing
+# these strings), e.g. OAuth `code` and WebAuthn `credential` (C01).
+config :phoenix, :filter_parameters, ~w(password token secret key code credential)
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

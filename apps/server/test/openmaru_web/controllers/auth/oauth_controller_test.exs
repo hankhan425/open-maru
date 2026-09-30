@@ -1,9 +1,10 @@
 defmodule OpenmaruWeb.Auth.OAuthControllerTest do
-  # Points the GitHub provider at a Bypass server through the application env.
+  # Points the GitHub and Google providers at a Bypass server through the application env.
   use OpenmaruWeb.ConnCase, async: false
 
   import Ecto.Query
 
+  alias Assent.JWTAdapter.AssentJWT
   alias Openmaru.Accounts.{OAuthIdentity, User}
   alias Openmaru.{ClockMock, Repo}
 
@@ -408,7 +409,7 @@ defmodule OpenmaruWeb.Auth.OAuthControllerTest do
       pem = :public_key.pem_encode([:public_key.pem_entry_encode(:RSAPrivateKey, key)])
 
       {:ok, id_token} =
-        Assent.JWTAdapter.AssentJWT.sign(claims, "RS256", pem, json_library: Jason)
+        AssentJWT.sign(claims, "RS256", pem, json_library: Jason)
 
       Bypass.expect_once(bypass, "POST", "/token", fn conn ->
         json_resp(conn, %{
