@@ -87,6 +87,7 @@ openmaru/
 | `Openmaru.Runtime` | sessions, runtime adapters (E2B), compute metering, supervision | `start_session/2`, `stop_session/2` |
 | `Openmaru.Activity` | append-only activity events + PubSub broadcast | `emit/1`, `list/2` |
 | `Openmaru.Public` | read models for public pages (aggregations, world graph) | `goal_summary/1`, `world/0` |
+| `Openmaru.Audit` | the append-only security audit log (SPEC-09 §7); every context records its security-relevant actions here | `record/1` |
 
 Rules: contexts call each other only through public functions. Cross-context writes that must be atomic use `Ecto.Multi` built by the *owning* context (e.g. `Ledger.multi_create_transfers/2`).
 

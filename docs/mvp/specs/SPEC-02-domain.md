@@ -8,12 +8,12 @@ A principal is `{kind: person|agent|system, id}`. Stored as `(principal_kind, pr
 
 | Table | Key columns |
 |---|---|
-| `users` | `handle citext unique null` (picked after sign-up, lower-cased, `^[a-z0-9][a-z0-9_-]{1,29}$`, not reserved, immutable once set), `display_name`, `email citext unique null` (provider-verified only), `platform_role` (`user`/`admin`), `suspended_at`, `webauthn_user_handle bytea unique null` (WebAuthn `user.id`, 32 random bytes) |
+| `users` | `handle citext unique null` (picked after sign-up, lower-cased, `^[a-z0-9][a-z0-9_-]{1,29}$`, not reserved and not starting with `deleted-user-`, immutable once set), `display_name`, `email citext unique null` (provider-verified only), `platform_role` (`user`/`admin`), `suspended_at`, `webauthn_user_handle bytea unique null` (WebAuthn `user.id`, 32 random bytes) |
 | `passkeys` | `user_id`, `credential_id bytea unique`, `cose_key bytea`, `sign_count`, `transports text[]`, `last_used_at` |
 | `oauth_identities` | `user_id`, `provider` (`github`/`google`), `provider_uid`, unique(`provider`,`provider_uid`) |
 | `user_sessions` | `user_id`, `token_hash unique`, `expires_at`, `revoked_at` |
 | `auth_challenges` | `kind` (`passkey_registration`/`passkey_login`/`oauth`), `challenge bytea null`, `user_id null`, `data jsonb` (user handle or OAuth state/nonce), `expires_at` (5 min), `consumed_at` (single use) |
-| `audit_log` | `action`, `actor_kind`/`actor_id`, `target_type`/`target_id`, `ip_hash` (keyed hash, OQ-6), `user_agent`, `metadata jsonb`, `occurred_at`; append-only (trigger rejects UPDATE/DELETE/TRUNCATE), SPEC-09 §7 |
+| `audit_log` | `action`, `actor_kind`/`actor_id`, `target_type`/`target_id`, `ip_hash` (keyed hash, OQ-6), `ip_hash_key_id`, `user_agent`, `metadata jsonb`, `occurred_at`; append-only (trigger rejects UPDATE/DELETE/TRUNCATE), SPEC-09 §7 |
 | `personal_access_tokens` | `user_id`, `name`, `token_hash unique`, `last4`, `expires_at null`, `revoked_at`, `last_used_at` |
 | `device_codes` | `device_code_hash unique`, `user_code unique`, `status` (`pending/approved/denied/expired/consumed`), `user_id null`, `expires_at`, `interval_secs` |
 | `orgs` | `slug citext unique` (`[a-z0-9-]{3,40}`), `name`, `active_version_id`, `status` (`active/suspended`), `created_by` |

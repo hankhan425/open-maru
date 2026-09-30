@@ -79,6 +79,8 @@ Auth column: **S** session cookie, **P** personal access token, **M** mandate to
 
 Envelope: `{"error":{"code","message","details"}}`. Validation errors carry `details.diagnostics` (SPEC-01 §5 shape).
 
+Choosing between the generic codes: `invalid_request` (400) is a malformed request or a failed protocol step (unparseable body, unknown or expired challenge or OAuth state); `validation_failed` (422) is a well-formed request refused by a rule, with `details.fields` for field errors and `details.reason` for a machine-readable subtype (e.g. `handle_immutable`, `no_changes`); a 409 code is a conflict with another resource or a concurrent change (`handle_taken`, `stale_proposal`).
+
 | Code | HTTP | Code | HTTP |
 |---|---|---|---|
 | `unauthenticated` | 401 | `invalid_token` | 401 |
