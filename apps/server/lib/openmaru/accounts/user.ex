@@ -4,7 +4,8 @@ defmodule Openmaru.Accounts.User do
   once and never changes (C01).
 
   Handles match `^[a-z0-9][a-z0-9_-]{1,29}$` after lower-casing, are unique ignoring
-  case (`citext`), and exclude a reserved list.
+  case (`citext`), and exclude a reserved list and the `deleted-user-` prefix (kept for
+  account deletion, SPEC-09 §4: a live user must never look like a deleted one).
   """
 
   use Openmaru.Schema
@@ -13,6 +14,7 @@ defmodule Openmaru.Accounts.User do
 
   @handle_format ~r/\A[a-z0-9][a-z0-9_-]{1,29}\z/
   @reserved_handles ~w(admin api app auth help mcp openmaru root settings support system www gw)
+  @reserved_prefixes ~w(deleted-user-)
   @display_name_max 80
 
   @type t :: %__MODULE__{
@@ -41,6 +43,10 @@ defmodule Openmaru.Accounts.User do
   @doc "Handles nobody may take."
   @spec reserved_handles() :: [String.t()]
   def reserved_handles, do: @reserved_handles
+
+  @doc "Prefixes no handle may start with."
+  @spec reserved_prefixes() :: [String.t()]
+  def reserved_prefixes, do: @reserved_prefixes
 
   @doc "Whether the user is suspended (SPEC-09 §6)."
   @spec suspended?(t()) :: boolean()
@@ -72,6 +78,7 @@ defmodule Openmaru.Accounts.User do
       message: "must be 2-30 characters: a-z, 0-9, _ or -, starting with a letter or digit"
     )
     |> validate_exclusion(:handle, @reserved_handles, message: "is reserved")
+    |> validate_change(:handle, &reject_reserved_prefix/2)
     |> unique_constraint(:handle)
     |> check_constraint(:handle, name: :handle_format, message: "has an invalid format")
   end
@@ -91,6 +98,10 @@ defmodule Openmaru.Accounts.User do
     user
     |> change(email: String.downcase(email))
     |> unique_constraint(:email)
+  end
+
+  defp reject_reserved_prefix(:handle, handle) do
+    if String.starts_with?(handle, @reserved_prefixes), do: [handle: "is reserved"], else: []
   end
 
   defp truncate(nil, _max), do: nil

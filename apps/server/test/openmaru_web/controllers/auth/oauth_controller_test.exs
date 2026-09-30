@@ -181,11 +181,29 @@ defmodule OpenmaruWeb.Auth.OAuthControllerTest do
   } do
     insert!(:user, email: "octocat@example.com")
 
-    conn = github_sign_in(conn, bypass, @octocat, unverified("octocat@example.com"), "text/html")
+    conn = github_sign_in(conn, bypass, @octocat, verified("octocat@example.com"), "text/html")
 
     assert redirected_to(conn, 302) == @web_url <> "/signin?error=account_exists"
     refute Map.has_key?(conn.resp_cookies, session_cookie())
     assert identities() == []
+  end
+
+  test "C01-T08 an unverified provider email matching an existing user is ignored", %{
+    conn: conn,
+    bypass: bypass
+  } do
+    existing = insert!(:user, email: "octocat@example.com")
+
+    conn = github_sign_in(conn, bypass, @octocat, unverified("octocat@example.com"))
+
+    # Not account_exists: that would tell whoever typed the address that it has an account.
+    body = json_response(conn, 200)
+    assert body["email"] == nil
+    refute uuid!(body["id"], "usr") == existing.id
+    assert %{value: _} = conn.resp_cookies[session_cookie()]
+    assert [%OAuthIdentity{user_id: new_id}] = identities()
+    assert Repo.get!(User, new_id).email == nil
+    assert Repo.get!(User, existing.id).email == "octocat@example.com"
   end
 
   test "C01-T09 signed in with a provider-verified email → identity linked to the current user",

@@ -32,13 +32,10 @@ defmodule OpenmaruWeb.Auth.MeController do
     request_body: {"Changes", "application/json", Schemas.UpdateMe},
     responses: [
       ok: {"The user", "application/json", Schemas.User},
-      bad_request:
-        {"Handle already set (`details.reason: handle_immutable`)", "application/json",
-         ErrorResponse},
       conflict: {"handle_taken", "application/json", ErrorResponse},
       unprocessable_entity:
-        {"Invalid or reserved handle, or display name too long", "application/json",
-         ErrorResponse}
+        {"Invalid or reserved handle, handle already set (`details.reason: handle_immutable`), or display name too long",
+         "application/json", ErrorResponse}
     ]
   )
 

@@ -9,8 +9,8 @@ defmodule Openmaru.Accounts do
     assertion and is audited.
   * **OAuth** — `begin_oauth/2` stores the state (and OIDC nonce); `oauth_callback/3`
     consumes it. Linking happens only for a signed-in user and a provider-verified
-    email; a signed-out sign-in whose email matches an existing user is refused with
-    `account_exists` (no silent linking).
+    email; a signed-out sign-in whose verified email matches an existing user is refused
+    with `account_exists` (no silent linking). Unverified emails are ignored.
   * **Handles** — picked once, never changed (`set_handle/2`).
   * **Sessions** — opaque 32-byte tokens, stored as SHA-256, 30-day sliding expiry.
 
@@ -325,7 +325,9 @@ defmodule Openmaru.Accounts do
     * a new identity while signed in is linked when the provider verified the email
       (`{:linked, user}`), else `forbidden` (`email_not_verified`);
     * a new identity while signed out creates a user (`{:registered, user}`) unless its
-      email belongs to an existing user → `account_exists`.
+      provider-verified email belongs to an existing user → `account_exists`. An
+      unverified email is neither stored nor matched, so it cannot block a sign-up or
+      reveal that an account exists.
 
   A suspended user is `forbidden`; state or provider failures are `invalid_request`.
   """
@@ -432,7 +434,7 @@ defmodule Openmaru.Accounts do
   end
 
   defp resolve_identity(nil, nil, provider, account, meta) do
-    if account.email && email_taken?(account.email) do
+    if account.email_verified && account.email && email_taken?(account.email) do
       audit_sign_in_failure(nil, Atom.to_string(provider), "account_exists", meta)
       {:error, account_exists()}
     else
@@ -487,8 +489,8 @@ defmodule Openmaru.Accounts do
   Sets `user`'s handle. The value is lower-cased, must match
   `^[a-z0-9][a-z0-9_-]{1,29}$` and not be reserved (`validation_failed` via the
   changeset), and must be free ignoring case (`handle_taken`). Once set a handle never
-  changes: a different value is `invalid_request` with `details.reason` `handle_immutable`;
-  the same value is a no-op.
+  changes: a different value is `validation_failed` with `details.reason`
+  `handle_immutable`; the same value is a no-op.
   """
   @spec set_handle(User.t(), term()) :: {:ok, User.t()} | {:error, Error.t() | Ecto.Changeset.t()}
   def set_handle(%User{} = user, handle) do
@@ -545,9 +547,13 @@ defmodule Openmaru.Accounts do
     end)
   end
 
+  # A well-formed request refused by a rule: 422, like the other handle errors (OQ-5).
   defp handle_immutable do
     {:error,
-     Error.new(:invalid_request, "Handles cannot be changed", %{reason: "handle_immutable"})}
+     Error.new(:validation_failed, "Handles cannot be changed", %{
+       reason: "handle_immutable",
+       fields: %{handle: ["cannot be changed"]}
+     })}
   end
 
   ## Sessions

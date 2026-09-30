@@ -111,7 +111,7 @@ defmodule Openmaru.AccountsTest do
       assert {:ok, %User{handle: "mine"}} = Accounts.set_handle(user, "MINE")
       assert {:ok, %User{handle: "mine"}} = Accounts.set_handle(Repo.reload!(user), "mine")
 
-      assert {:error, %{code: :invalid_request, details: %{reason: "handle_immutable"}}} =
+      assert {:error, %{code: :validation_failed, details: %{reason: "handle_immutable"}}} =
                Accounts.set_handle(Repo.reload!(user), "other")
     end
 
@@ -119,7 +119,9 @@ defmodule Openmaru.AccountsTest do
       user = insert!(:user, handle: nil)
       assert {:ok, _} = Accounts.set_handle(user, "first")
 
-      assert {:error, %{code: :invalid_request}} = Accounts.set_handle(user, "second")
+      assert {:error, %{code: :validation_failed, details: %{reason: "handle_immutable"}}} =
+               Accounts.set_handle(user, "second")
+
       assert Repo.reload!(user).handle == "first"
     end
   end

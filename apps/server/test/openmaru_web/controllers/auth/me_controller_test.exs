@@ -76,6 +76,18 @@ defmodule OpenmaruWeb.Auth.MeControllerTest do
       assert Repo.get!(User, user.id).handle == nil
     end
 
+    test "C01-T10 handles starting with deleted-user- are reserved", %{conn: conn, user: user} do
+      for handle <- ~w(deleted-user-1 Deleted-User-42 deleted-user-x) do
+        assert %{"error" => %{"code" => "validation_failed", "details" => %{"fields" => fields}}} =
+                 conn |> patch_me(%{"handle" => handle}) |> json_response(422)
+
+        assert fields["handle"] == ["is reserved"]
+      end
+
+      assert conn |> patch_me(%{"handle" => "deleted-users"}) |> json_response(200)
+      assert Repo.get!(User, user.id).handle == "deleted-users"
+    end
+
     test "C01-T10 a handle taken case-insensitively is 409 handle_taken", %{
       conn: conn,
       user: user
@@ -118,19 +130,22 @@ defmodule OpenmaruWeb.Auth.MeControllerTest do
       assert reloaded.email == user.email
     end
 
-    test "C01-T11 changing an already-set handle is invalid_request with handle_immutable", %{
+    test "C01-T11 changing an already-set handle is 422 with handle_immutable", %{
       conn: conn,
       user: user
     } do
       assert conn |> patch_me(%{"handle" => "alice"}) |> json_response(200)
 
-      # SPEC-07 §2 maps invalid_request to 400; the task's "422" is OQ-5.
+      # OQ-5: validation_failed (422) like the other handle errors, with the reason.
       assert %{
                "error" => %{
-                 "code" => "invalid_request",
-                 "details" => %{"reason" => "handle_immutable"}
+                 "code" => "validation_failed",
+                 "details" => %{
+                   "reason" => "handle_immutable",
+                   "fields" => %{"handle" => [_message]}
+                 }
                }
-             } = conn |> patch_me(%{"handle" => "alice2"}) |> json_response(400)
+             } = conn |> patch_me(%{"handle" => "alice2"}) |> json_response(422)
 
       assert Repo.get!(User, user.id).handle == "alice"
     end
@@ -145,8 +160,12 @@ defmodule OpenmaruWeb.Auth.MeControllerTest do
     test "C01-T11 a handle cannot be cleared", %{conn: conn} do
       assert conn |> patch_me(%{"handle" => "alice"}) |> json_response(200)
 
-      assert %{"error" => %{"code" => "invalid_request"}} =
-               conn |> patch_me(%{"handle" => nil}) |> json_response(400)
+      assert %{
+               "error" => %{
+                 "code" => "validation_failed",
+                 "details" => %{"reason" => "handle_immutable"}
+               }
+             } = conn |> patch_me(%{"handle" => nil}) |> json_response(422)
     end
   end
 
