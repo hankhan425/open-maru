@@ -10,6 +10,7 @@ Auth column: **S** session cookie, **P** personal access token, **M** mandate to
 | `POST /auth/passkey/register/options`, `POST /auth/passkey/register` | — / S | C01 |
 | `POST /auth/passkey/login/options`, `POST /auth/passkey/login` | — | C01 |
 | `GET /auth/oauth/:provider`, `GET /auth/oauth/:provider/callback` | — | C01 |
+| `GET /auth/csrf` → `{csrf_token}` (send as `x-csrf-token` on cookie-authenticated mutations) | S | C01 |
 | `POST /auth/logout` | S | C01 |
 | `GET /me`, `PATCH /me` (handle, display name) | S P | C01 |
 | `POST /auth/device/code`, `POST /auth/device/token` | — | C02 |

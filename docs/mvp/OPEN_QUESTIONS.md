@@ -94,3 +94,35 @@ ARCHITECTURE > PRD.
   a problem. The derived monthly limit is summed exactly; over the money maximum the checker
   reports the new E318 on the goal (SPEC-01 §5, §6.1; L03-T32), rather than saturating, which
   would understate the bound the charter states.
+
+### OQ-5: Status of the "handle already set" error
+- **Task:** C01
+- **Status:** open
+- **Conflict:** C01-T11 expects "422 `invalid_request` (`handle_immutable` in details)". SPEC-07 §2
+  maps `invalid_request` to 400 and gives 422 to `validation_failed`, and `Openmaru.Error.status/1`
+  derives the HTTP status from the code everywhere.
+- **Options:** (a) keep the code, answer 400 `invalid_request` with
+  `details.reason: "handle_immutable"`; (b) keep the status, answer 422 `validation_failed` with
+  the reason in `details`; (c) answer 422 with `invalid_request`, breaking the code-to-status
+  table.
+- **Chosen (interim):** (a). Clients switch on codes (CONVENTIONS §4), so the test keeps the code
+  and the `handle_immutable` detail and asserts 400. An invalid or reserved handle stays 422
+  `validation_failed` (C01-T10).
+- **Resolution:**
+
+### OQ-6: When the audit log hashes client IPs
+- **Task:** C01
+- **Status:** open
+- **Conflict:** SPEC-09 §7 records the "IP (hashed after 30 days)", which means keeping the raw
+  address for 30 days and rewriting the row later. C01 makes `audit_log` append-only with a
+  trigger that rejects `UPDATE` (C01-T18), and C01-T18 expects sign-in rows "written with hashed
+  IP".
+- **Options:** (a) hash at write time; (b) keep raw IPs in a separate, mutable table that a job
+  deletes after 30 days, referenced from the audit row; (c) let the trigger allow one `UPDATE`
+  that only replaces the IP with its hash.
+- **Chosen (interim):** (a). `audit_log.ip_hash` holds HMAC-SHA-256 of the address under a server
+  key (`Openmaru.Audit.hash_ip/1`; derived from `SECRET_KEY_BASE` in production), so equal
+  addresses still correlate and the IPv4 space cannot be brute-forced without the key. No raw IP
+  is stored, which is stricter than SPEC-09 §7; abuse handling within 30 days works on the
+  hashes.
+- **Resolution:**

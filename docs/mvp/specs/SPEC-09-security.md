@@ -1,9 +1,9 @@
 # SPEC-09 — Security, privacy, abuse
 
 ## 1. Authentication
-- Passkeys (WebAuthn, `wax_`): user verification required; sign-count regression rejects the assertion.
-- OAuth (GitHub, Google) via `assent`; account linking only when the email is verified by the provider **and** the user is signed in.
-- Web sessions: opaque random token (32 bytes) in an `HttpOnly; Secure; SameSite=Lax` cookie; stored hashed; 30-day sliding expiry; revocable. Mutating requests require `x-csrf-token`.
+- Passkeys (WebAuthn, `wax_`): discoverable credentials, user verification required, `none` attestation; challenges stored server-side (5 minutes, single use). Sign-count regression rejects the assertion: the counter must increase unless both the stored and the reported value are 0 (authenticators without a counter).
+- OAuth (GitHub, Google) via `assent`, with `state` (and the OIDC `nonce` for Google) stored server-side for 5 minutes and bound to the browser by a cookie. Account linking only when the email is verified by the provider **and** the user is signed in. Signed out, a provider email that belongs to an existing user is refused with `account_exists` (no linking); a new user keeps the provider email only if verified.
+- Web sessions: opaque random token (32 bytes) in an `HttpOnly; Secure; SameSite=Lax` cookie; stored hashed; 30-day sliding expiry (moved at most hourly); revocable. A suspended user's sessions are rejected with 403 `forbidden`. Cookie-authenticated mutating requests require `x-csrf-token` (from `GET /api/v1/auth/csrf`, bound to the session).
 - PATs: `om_pat_` + 32 random bytes base64url; stored as SHA-256; shown once; optional expiry; `last_used_at` updated at most once per minute.
 - Device flow: `user_code` 8 chars from an unambiguous alphabet, 10-minute expiry, polling interval 5 s (`slow_down` if faster), single use.
 - Mandate tokens: SPEC-04 §4.
@@ -40,7 +40,7 @@ Presigned PUT to private bucket; max 10 MB; allowed types: `application/pdf`, `i
 - Webhooks verify Stripe signatures and tolerance window (5 min).
 
 ## 7. Audit
-`audit_log` (append-only, trigger-protected): security-relevant actions — sign-ins, token mint/revoke, secret writes, pause/resume/stop, admin actions, spec activations — with actor, IP (hashed after 30 days), user agent, and target.
+`audit_log` (append-only, trigger-protected): security-relevant actions — sign-ins, token mint/revoke, secret writes, pause/resume/stop, admin actions, spec activations — with actor, IP (hashed after 30 days; C01 hashes at write time, see OQ-6), user agent, and target.
 
 ## 8. Web hardening
 CSP: `default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self' wss://<host> https://*.stripe.com; frame-src https://*.stripe.com; img-src 'self' data:; style-src 'self' 'unsafe-inline'; font-src 'self'`. HSTS, `X-Content-Type-Options`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` minimal. CORS: web origin only for `/api/v1`; gateway and `/mcp` accept any origin but only token auth (no cookies).
