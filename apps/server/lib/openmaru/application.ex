@@ -6,10 +6,13 @@ defmodule Openmaru.Application do
   use Application
 
   alias Openmaru.Logger.Scrubber
+  alias OpenmaruWeb.Plugs.ClientIP
 
   @impl true
   def start(_type, _args) do
     install_log_scrubber()
+    # Fail at boot, not on the first request, when TRUSTED_PROXIES is malformed.
+    _proxies = ClientIP.trusted_proxies!()
 
     children = [
       OpenmaruWeb.Telemetry,

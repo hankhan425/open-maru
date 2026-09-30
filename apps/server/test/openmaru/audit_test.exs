@@ -14,6 +14,7 @@ defmodule Openmaru.AuditTest do
           actor_kind: e.actor_kind,
           actor_id: type(e.actor_id, Ecto.UUID),
           ip_hash: e.ip_hash,
+          ip_hash_key_id: e.ip_hash_key_id,
           user_agent: e.user_agent,
           metadata: e.metadata
         }
@@ -75,6 +76,7 @@ defmodule Openmaru.AuditTest do
     assert login.actor_kind == "person"
     assert login.actor_id == uuid!(user["id"], "usr")
     assert login.ip_hash == Audit.hash_ip(conn.remote_ip)
+    assert login.ip_hash_key_id == Audit.ip_hash_key_id()
     refute login.ip_hash =~ ip_string(conn.remote_ip)
     assert login.user_agent == "TestBrowser/1.0"
   end
@@ -100,5 +102,40 @@ defmodule Openmaru.AuditTest do
     unkeyed = :sha256 |> :crypto.hash("203.0.113.7") |> Base.encode16(case: :lower)
     refute Audit.hash_ip(ip) == unkeyed
     assert Audit.hash_ip(nil) == nil
+  end
+
+  test "C01-T18 rows record the id of the key that hashed the IP" do
+    {:ok, with_ip} = Audit.record(%{action: "test.key_id", ip: {203, 0, 113, 7}})
+    {:ok, without_ip} = Audit.record(%{action: "test.key_id"})
+
+    assert with_ip.ip_hash_key_id == Audit.ip_hash_key_id()
+    assert without_ip.ip_hash == nil and without_ip.ip_hash_key_id == nil
+
+    key = Application.fetch_env!(:openmaru, Audit)[:ip_hash_key]
+    assert Audit.ip_hash_key_id() == Audit.key_id(key)
+    assert Audit.key_id(key) =~ ~r/\A[0-9a-f]{8}\z/
+    # A rotated key has a different id, so old and new hashes are told apart.
+    refute Audit.key_id(key <> "rotated") == Audit.key_id(key)
+    refute Audit.key_id(key) =~ key
+  end
+
+  test "C01-T18 a hash without its key id (or the reverse) is rejected by the database" do
+    for {hash, key_id} <- [{"abc", nil}, {nil, "0000abcd"}] do
+      assert_raise Postgrex.Error, ~r/ip_hash_key_id/, fn ->
+        Repo.transaction(fn ->
+          Repo.insert_all("audit_log", [
+            %{
+              id: Ecto.UUID.dump!(Ecto.UUID.generate()),
+              action: "test.constraint",
+              ip_hash: hash,
+              ip_hash_key_id: key_id,
+              metadata: %{},
+              occurred_at: DateTime.utc_now(),
+              inserted_at: DateTime.utc_now()
+            }
+          ])
+        end)
+      end
+    end
   end
 end

@@ -41,8 +41,14 @@ config :openmaru, Openmaru.Accounts.WebAuthn,
 # OAuth providers are enabled by a client_id (config/runtime.exs reads them from env).
 config :openmaru, Openmaru.Accounts.OAuth, providers: [github: [], google: []]
 
-# Key for the audit log's IP hash (Openmaru.Audit); derived from SECRET_KEY_BASE in prod.
+# Key for the audit log's IP hash (Openmaru.Audit); AUDIT_IP_HASH_KEY in prod.
 config :openmaru, Openmaru.Audit, ip_hash_key: "dev-only audit ip hash key"
+
+# SPEC-09 §6 rate limits per bucket; config/runtime.exs can override them per environment.
+config :openmaru, OpenmaruWeb.Plugs.RateLimit, limits: [auth: [limit: 10, scale_ms: 60_000]]
+
+# Proxies whose x-forwarded-for is believed (CIDRs). Empty: the TCP peer is the client.
+config :openmaru, OpenmaruWeb.Plugs.ClientIP, trusted_proxies: []
 
 # Where OAuth callbacks send the browser.
 config :openmaru, :web_url, "http://localhost:5173"

@@ -10,8 +10,9 @@ defmodule Openmaru.Repo.Migrations.CreateAuditLog do
       add :actor_id, :uuid
       add :target_type, :text
       add :target_id, :uuid
-      # Keyed hash of the client IP (docs/mvp/OPEN_QUESTIONS.md OQ-6).
+      # Keyed hash of the client IP and the id of the key that made it (SPEC-09 §7, OQ-6).
       add :ip_hash, :text
+      add :ip_hash_key_id, :text
       add :user_agent, :text
       add :metadata, :map, null: false, default: %{}
       add :occurred_at, :utc_datetime_usec, null: false
@@ -25,6 +26,10 @@ defmodule Openmaru.Repo.Migrations.CreateAuditLog do
 
     create constraint(:audit_log, :actor_kind,
              check: "actor_kind IS NULL OR actor_kind IN ('person', 'agent', 'system')"
+           )
+
+    create constraint(:audit_log, :ip_hash_key_id,
+             check: "(ip_hash IS NULL) = (ip_hash_key_id IS NULL)"
            )
 
     execute(

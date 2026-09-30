@@ -6,7 +6,10 @@ defmodule Openmaru.Audit do
 
   Client IPs are stored only as a keyed hash (`hash_ip/1`, HMAC-SHA-256 with the
   `:ip_hash_key` of this module's config), so equal addresses can be correlated without
-  keeping them (docs/mvp/OPEN_QUESTIONS.md OQ-6).
+  keeping them (SPEC-09 §7, OQ-6). The key is dedicated to this purpose
+  (`AUDIT_IP_HASH_KEY` in production, not derived from `SECRET_KEY_BASE`), and each row
+  records the key's id (`key_id/1`, a fingerprint of the key). After a rotation, hashes
+  under the new key do not match older ones; the id tells them apart.
   """
 
   alias Openmaru.Audit.Entry
@@ -43,6 +46,7 @@ defmodule Openmaru.Audit do
       target_type: target_type,
       target_id: target_id,
       ip_hash: hash_ip(attrs[:ip]),
+      ip_hash_key_id: if(attrs[:ip], do: ip_hash_key_id()),
       user_agent: truncate(attrs[:user_agent]),
       metadata: Map.get(attrs, :metadata, %{}),
       occurred_at: Openmaru.Schema.timestamp()
@@ -60,6 +64,22 @@ defmodule Openmaru.Audit do
   def hash_ip(ip) when is_binary(ip) do
     :hmac
     |> :crypto.mac(:sha256, ip_hash_key(), ip)
+    |> Base.encode16(case: :lower)
+  end
+
+  @doc "The id of the configured IP hash key (see `key_id/1`)."
+  @spec ip_hash_key_id() :: String.t()
+  def ip_hash_key_id, do: key_id(ip_hash_key())
+
+  @doc """
+  The id recorded next to hashes made with `key`: the first 8 hex digits of a SHA-256
+  over the key. It changes whenever the key does, so a rotation needs no separate id.
+  """
+  @spec key_id(binary()) :: String.t()
+  def key_id(key) when is_binary(key) do
+    :sha256
+    |> :crypto.hash(["openmaru audit ip hash key id:", key])
+    |> binary_part(0, 4)
     |> Base.encode16(case: :lower)
   end
 

@@ -34,6 +34,20 @@ if config_env() != :test do
 
   config :openmaru, Openmaru.Accounts.OAuth,
     providers: [github: oauth_provider.("GITHUB"), google: oauth_provider.("GOOGLE")]
+
+  # SPEC-09 §6 sets 10; raise it where many sign-ins share one IP (e2e runs, demos).
+  config :openmaru, OpenmaruWeb.Plugs.RateLimit,
+    limits: [
+      auth: [
+        limit: String.to_integer(System.get_env("AUTH_RATE_LIMIT_PER_MINUTE", "10")),
+        scale_ms: 60_000
+      ]
+    ]
+
+  # Load balancers in front of the app (comma-separated CIDRs). Unset: x-forwarded-for
+  # is ignored and the TCP peer is the client.
+  config :openmaru, OpenmaruWeb.Plugs.ClientIP,
+    trusted_proxies: "TRUSTED_PROXIES" |> System.get_env("") |> String.split(",", trim: true)
 end
 
 if config_env() == :prod do
@@ -74,13 +88,40 @@ if config_env() == :prod do
   web_url = System.get_env("WEB_URL") || "https://#{host}"
   config :openmaru, :web_url, web_url
 
+  # Every passkey is bound to the relying party id, so it can never change: set it
+  # explicitly (the registrable domain, e.g. openmaru.org) instead of deriving it.
+  rp_id =
+    System.get_env("WEBAUTHN_RP_ID") ||
+      raise """
+      environment variable WEBAUTHN_RP_ID is missing.
+      It is the WebAuthn relying party id, e.g. openmaru.org. Passkeys are bound to it
+      for good, so pick the registrable domain rather than a subdomain.
+      """
+
+  web_host = URI.parse(web_url).host
+
+  unless web_host == rp_id or String.ends_with?(web_host, "." <> rp_id) do
+    raise "WEBAUTHN_RP_ID (#{rp_id}) must be WEB_URL's host (#{web_host}) or a parent domain"
+  end
+
   config :openmaru, Openmaru.Accounts.WebAuthn,
-    rp_id: System.get_env("WEBAUTHN_RP_ID") || URI.parse(web_url).host,
+    rp_id: rp_id,
     rp_name: "openmaru",
     origin: web_url
 
-  config :openmaru, Openmaru.Audit,
-    ip_hash_key: :crypto.mac(:hmac, :sha256, secret_key_base, "openmaru audit ip hash")
+  # A key of its own, so rotating SECRET_KEY_BASE leaves audit IP hashes comparable.
+  audit_ip_hash_key =
+    System.get_env("AUDIT_IP_HASH_KEY") ||
+      raise """
+      environment variable AUDIT_IP_HASH_KEY is missing.
+      It keys the audit log's IP hashes (SPEC-09 §7). Generate one with: mix phx.gen.secret
+      """
+
+  if byte_size(audit_ip_hash_key) < 32 do
+    raise "AUDIT_IP_HASH_KEY must be at least 32 bytes"
+  end
+
+  config :openmaru, Openmaru.Audit, ip_hash_key: audit_ip_hash_key
 
   config :openmaru, OpenmaruWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],

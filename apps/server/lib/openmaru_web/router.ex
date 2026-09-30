@@ -22,9 +22,9 @@ defmodule OpenmaruWeb.Router do
     plug OpenmaruWeb.Plugs.Session
   end
 
-  # SPEC-09 §6: auth 10/min/IP. Runs before the session lookup.
+  # SPEC-09 §6: auth 10/min/IP (limit in config). Runs before the session lookup.
   pipeline :auth_rate_limit do
-    plug OpenmaruWeb.Plugs.RateLimit, bucket: :auth, limit: 10, scale_ms: 60_000
+    plug OpenmaruWeb.Plugs.RateLimit, bucket: :auth
   end
 
   pipeline :signed_in do

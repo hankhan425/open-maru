@@ -11,6 +11,7 @@ defmodule Openmaru.Audit.Entry do
           target_type: String.t() | nil,
           target_id: Ecto.UUID.t() | nil,
           ip_hash: String.t() | nil,
+          ip_hash_key_id: String.t() | nil,
           user_agent: String.t() | nil,
           metadata: map() | nil,
           occurred_at: DateTime.t() | nil,
@@ -24,6 +25,7 @@ defmodule Openmaru.Audit.Entry do
     field :target_type, :string
     field :target_id, Ecto.UUID
     field :ip_hash, :string
+    field :ip_hash_key_id, :string
     field :user_agent, :string
     field :metadata, :map, default: %{}
     field :occurred_at, :utc_datetime_usec
