@@ -31,10 +31,16 @@ defmodule OpenmaruWeb.Auth.OAuthControllerTest do
         token_url: base <> "/login/oauth/access_token"
       )
 
+    google =
+      original
+      |> Keyword.fetch!(:providers)
+      |> Keyword.fetch!(:google)
+      |> Keyword.merge(client_id: "g-client", client_secret: "g-secret", base_url: base)
+
     Application.put_env(
       :openmaru,
       Openmaru.Accounts.OAuth,
-      Keyword.update!(original, :providers, &Keyword.put(&1, :github, github))
+      Keyword.update!(original, :providers, &Keyword.merge(&1, github: github, google: google))
     )
 
     on_exit(fn -> Application.put_env(:openmaru, Openmaru.Accounts.OAuth, original) end)
@@ -348,6 +354,107 @@ defmodule OpenmaruWeb.Auth.OAuthControllerTest do
         })
 
       assert redirected_to(conn, 302) == @web_url <> "/signin?error=invalid_request"
+    end
+  end
+
+  describe "Google (OpenID Connect)" do
+    setup %{bypass: bypass} do
+      base = "http://localhost:#{bypass.port}"
+      key = :public_key.generate_key({:rsa, 2048, 65_537})
+
+      Bypass.stub(bypass, "GET", "/.well-known/openid-configuration", fn conn ->
+        json_resp(conn, %{
+          "issuer" => base,
+          "authorization_endpoint" => base <> "/o/oauth2/v2/auth",
+          "token_endpoint" => base <> "/token",
+          "jwks_uri" => base <> "/certs"
+        })
+      end)
+
+      %{base: base, key: key}
+    end
+
+    defp json_resp(conn, body) do
+      conn
+      |> Plug.Conn.put_resp_content_type("application/json")
+      |> Plug.Conn.resp(200, Jason.encode!(body))
+    end
+
+    defp jwk({:RSAPrivateKey, _version, n, e, _d, _p, _q, _dp, _dq, _qi, _other}) do
+      encode = &(&1 |> :binary.encode_unsigned() |> Base.url_encode64(padding: false))
+      %{"kty" => "RSA", "alg" => "RS256", "use" => "sig", "n" => encode.(n), "e" => encode.(e)}
+    end
+
+    # Starts the flow, then answers the token request with an ID token whose claims
+    # `claims_fun` builds from the nonce the server sent to the provider.
+    defp google_sign_in(conn, %{bypass: bypass, base: base, key: key}, claims_fun) do
+      conn = get(conn, ~p"/api/v1/auth/oauth/google")
+      location = URI.parse(redirected_to(conn, 302))
+
+      assert "#{location.scheme}://#{location.host}:#{location.port}#{location.path}" ==
+               base <> "/o/oauth2/v2/auth"
+
+      %{"state" => state, "nonce" => nonce} = URI.decode_query(location.query)
+      assert byte_size(nonce) >= 32
+
+      now = System.system_time(:second)
+
+      claims =
+        Map.merge(
+          %{"iss" => base, "aud" => "g-client", "iat" => now, "exp" => now + 600},
+          claims_fun.(nonce)
+        )
+
+      pem = :public_key.pem_encode([:public_key.pem_entry_encode(:RSAPrivateKey, key)])
+
+      {:ok, id_token} =
+        Assent.JWTAdapter.AssentJWT.sign(claims, "RS256", pem, json_library: Jason)
+
+      Bypass.expect_once(bypass, "POST", "/token", fn conn ->
+        json_resp(conn, %{
+          "access_token" => "ya29.test",
+          "token_type" => "Bearer",
+          "expires_in" => 3600,
+          "id_token" => id_token
+        })
+      end)
+
+      Bypass.expect_once(bypass, "GET", "/certs", fn conn ->
+        json_resp(conn, %{"keys" => [jwk(key)]})
+      end)
+
+      conn
+      |> recycle()
+      |> put_req_header("accept", "application/json")
+      |> get(~p"/api/v1/auth/oauth/google/callback", %{"code" => "code-1", "state" => state})
+    end
+
+    test "C01-T07 Google: an ID token carrying the stored nonce signs in a new user", ctx do
+      conn =
+        google_sign_in(ctx.conn, ctx, fn nonce ->
+          %{
+            "sub" => "google-42",
+            "nonce" => nonce,
+            "email" => "g@example.com",
+            "email_verified" => true,
+            "name" => "Gee"
+          }
+        end)
+
+      body = json_response(conn, 200)
+      assert body["email"] == "g@example.com"
+      assert body["display_name"] == "Gee"
+      assert [%{provider: "google", provider_uid: "google-42"}] = identities()
+    end
+
+    test "C01-T07 Google: an ID token with a different nonce is invalid_request", ctx do
+      conn =
+        google_sign_in(ctx.conn, ctx, fn _nonce ->
+          %{"sub" => "google-42", "nonce" => "replayed", "email_verified" => true}
+        end)
+
+      assert %{"error" => %{"code" => "invalid_request"}} = json_response(conn, 400)
+      assert identities() == []
     end
   end
 

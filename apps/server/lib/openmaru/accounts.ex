@@ -20,7 +20,6 @@ defmodule Openmaru.Accounts do
 
   import Ecto.Query
 
-  alias Ecto.Multi
   alias Openmaru.Accounts.{Challenge, OAuth, OAuthIdentity, Passkey, User, UserSession, WebAuthn}
   alias Openmaru.{Audit, Clock, Error, Repo}
 
@@ -61,8 +60,9 @@ defmodule Openmaru.Accounts do
           {WebAuthn.new_user_handle(), @anonymous_user_name, []}
 
         %User{} = user ->
+          user = ensure_webauthn_user_handle(user)
           ids = Repo.all(from p in Passkey, where: p.user_id == ^user.id, select: p.credential_id)
-          {user.webauthn_user_handle || WebAuthn.new_user_handle(), user_name(user), ids}
+          {user.webauthn_user_handle, user_name(user), ids}
       end
 
     {:ok, stored} =
@@ -151,46 +151,61 @@ defmodule Openmaru.Accounts do
   end
 
   defp store_passkey(nil, user_handle, attested, transports, meta) do
-    Multi.new()
-    |> Multi.insert(:user, User.registration_changeset(%{webauthn_user_handle: user_handle}))
-    |> Multi.run(:passkey, fn repo, %{user: user} ->
-      insert_passkey(repo, user, attested, transports)
+    transact(fn ->
+      with {:ok, user} <-
+             Repo.insert(User.registration_changeset(%{webauthn_user_handle: user_handle})),
+           {:ok, passkey} <- insert_passkey(user, attested, transports) do
+        {:ok, {user, passkey}}
+      end
     end)
-    |> Repo.transaction()
     |> case do
-      {:ok, %{user: user, passkey: passkey}} ->
+      {:ok, {user, passkey}} ->
         audit(meta, "passkey.registered", {:person, user.id}, {"passkey", passkey.id})
         audit_sign_in(user, "passkey", meta, %{"new_user" => true})
         {:ok, user}
 
-      {:error, _step, _reason, _changes} ->
+      {:error, _reason} ->
         {:error, invalid_request("Passkey could not be registered", "invalid_credential")}
     end
   end
 
-  defp store_passkey(%User{} = user, user_handle, attested, transports, meta) do
-    Multi.new()
-    |> Multi.run(:user, fn repo, _changes ->
-      case user.webauthn_user_handle do
-        nil -> repo.update(Ecto.Changeset.change(user, webauthn_user_handle: user_handle))
-        _set -> {:ok, user}
-      end
-    end)
-    |> Multi.run(:passkey, fn repo, %{user: user} ->
-      insert_passkey(repo, user, attested, transports)
-    end)
-    |> Repo.transaction()
-    |> case do
-      {:ok, %{user: user, passkey: passkey}} ->
+  # All of a user's passkeys share the user handle assigned when registration began.
+  defp store_passkey(
+         %User{webauthn_user_handle: user_handle} = user,
+         user_handle,
+         attested,
+         transports,
+         meta
+       ) do
+    case insert_passkey(user, attested, transports) do
+      {:ok, passkey} ->
         audit(meta, "passkey.registered", {:person, user.id}, {"passkey", passkey.id})
         {:ok, user}
 
-      {:error, _step, _reason, _changes} ->
+      {:error, _changeset} ->
         {:error, invalid_request("Passkey could not be registered", "invalid_credential")}
     end
   end
 
-  defp insert_passkey(repo, user, attested, transports) do
+  defp store_passkey(%User{}, _user_handle, _attested, _transports, _meta) do
+    {:error, invalid_request("Passkey could not be registered", "invalid_credential")}
+  end
+
+  # Assigned once, before the first ceremony, so concurrent registrations agree on it.
+  defp ensure_webauthn_user_handle(%User{webauthn_user_handle: nil} = user) do
+    Repo.update_all(from(u in User, where: u.id == ^user.id and is_nil(u.webauthn_user_handle)),
+      set: [
+        webauthn_user_handle: WebAuthn.new_user_handle(),
+        updated_at: Openmaru.Schema.timestamp()
+      ]
+    )
+
+    Repo.reload!(user)
+  end
+
+  defp ensure_webauthn_user_handle(user), do: user
+
+  defp insert_passkey(user, attested, transports) do
     %Passkey{
       user_id: user.id,
       credential_id: attested.credential_id,
@@ -200,7 +215,7 @@ defmodule Openmaru.Accounts do
     }
     |> Ecto.Changeset.change()
     |> Ecto.Changeset.unique_constraint(:credential_id)
-    |> repo.insert()
+    |> Repo.insert()
   end
 
   defp fetch_passkey(credential_id, meta) do
@@ -266,9 +281,9 @@ defmodule Openmaru.Accounts do
         where: p.id == ^passkey.id,
         where: p.sign_count < ^sign_count or (p.sign_count == 0 and ^sign_count == 0)
 
-    case Repo.update_all(query,
-           set: [sign_count: sign_count, last_used_at: Clock.now(), updated_at: Clock.now()]
-         ) do
+    now = Openmaru.Schema.timestamp()
+
+    case Repo.update_all(query, set: [sign_count: sign_count, last_used_at: now, updated_at: now]) do
       {1, _} -> :ok
       {0, _} -> sign_count_regression(Repo.reload!(passkey), sign_count, user, meta)
     end
@@ -390,19 +405,21 @@ defmodule Openmaru.Accounts do
   end
 
   defp resolve_identity(nil, %User{} = user, provider, %{email_verified: true} = account, meta) do
-    Multi.new()
-    |> Multi.insert(:identity, identity_changeset(user, provider, account))
-    |> Multi.run(:user, fn repo, _changes -> maybe_adopt_email(repo, user, account.email) end)
-    |> Repo.transaction()
+    transact(fn ->
+      with {:ok, identity} <- Repo.insert(identity_changeset(user, provider, account)),
+           {:ok, user} <- maybe_adopt_email(user, account.email) do
+        {:ok, {identity, user}}
+      end
+    end)
     |> case do
-      {:ok, %{identity: identity, user: user}} ->
+      {:ok, {identity, user}} ->
         audit(meta, "auth.oauth_linked", {:person, user.id}, {"oauth_identity", identity.id}, %{
           "provider" => Atom.to_string(provider)
         })
 
         {:ok, {:linked, user}}
 
-      {:error, _step, _reason, _changes} ->
+      {:error, _reason} ->
         {:error, account_exists()}
     end
   end
@@ -415,29 +432,31 @@ defmodule Openmaru.Accounts do
   end
 
   defp resolve_identity(nil, nil, provider, account, meta) do
-    method = Atom.to_string(provider)
-
     if account.email && email_taken?(account.email) do
-      audit_sign_in_failure(nil, method, "account_exists", meta)
+      audit_sign_in_failure(nil, Atom.to_string(provider), "account_exists", meta)
       {:error, account_exists()}
     else
-      attrs = %{
-        email: if(account.email_verified, do: account.email),
-        display_name: account.name
-      }
+      register_oauth_user(provider, account, meta)
+    end
+  end
 
-      Multi.new()
-      |> Multi.insert(:user, User.registration_changeset(attrs))
-      |> Multi.insert(:identity, &identity_changeset(&1.user, provider, account))
-      |> Repo.transaction()
-      |> case do
-        {:ok, %{user: user}} ->
-          audit_sign_in(user, method, meta, %{"new_user" => true})
-          {:ok, {:registered, user}}
+  # A new user from a signed-out sign-in; only a provider-verified email is kept.
+  defp register_oauth_user(provider, account, meta) do
+    attrs = %{email: if(account.email_verified, do: account.email), display_name: account.name}
 
-        {:error, _step, _reason, _changes} ->
-          {:error, account_exists()}
+    transact(fn ->
+      with {:ok, user} <- Repo.insert(User.registration_changeset(attrs)),
+           {:ok, _identity} <- Repo.insert(identity_changeset(user, provider, account)) do
+        {:ok, user}
       end
+    end)
+    |> case do
+      {:ok, user} ->
+        audit_sign_in(user, Atom.to_string(provider), meta, %{"new_user" => true})
+        {:ok, {:registered, user}}
+
+      {:error, _reason} ->
+        {:error, account_exists()}
     end
   end
 
@@ -452,11 +471,11 @@ defmodule Openmaru.Accounts do
   end
 
   # A verified provider email fills in a missing email unless another user has it.
-  defp maybe_adopt_email(repo, %User{email: nil} = user, email) when is_binary(email) do
-    if email_taken?(email), do: {:ok, user}, else: repo.update(User.email_changeset(user, email))
+  defp maybe_adopt_email(%User{email: nil} = user, email) when is_binary(email) do
+    if email_taken?(email), do: {:ok, user}, else: Repo.update(User.email_changeset(user, email))
   end
 
-  defp maybe_adopt_email(_repo, user, _email), do: {:ok, user}
+  defp maybe_adopt_email(user, _email), do: {:ok, user}
 
   defp email_taken?(email) do
     Repo.exists?(from u in User, where: u.email == ^String.downcase(email))
@@ -473,12 +492,7 @@ defmodule Openmaru.Accounts do
   """
   @spec set_handle(User.t(), term()) :: {:ok, User.t()} | {:error, Error.t() | Ecto.Changeset.t()}
   def set_handle(%User{} = user, handle) do
-    Repo.transaction(fn ->
-      case apply_handle(lock_user(user), handle) do
-        {:ok, user} -> user
-        {:error, reason} -> Repo.rollback(reason)
-      end
-    end)
+    transact(fn -> user |> lock_user() |> apply_handle(handle) end)
   end
 
   @doc """
@@ -488,14 +502,9 @@ defmodule Openmaru.Accounts do
   @spec update_profile(User.t(), map()) ::
           {:ok, User.t()} | {:error, Error.t() | Ecto.Changeset.t()}
   def update_profile(%User{} = user, params) when is_map(params) do
-    Repo.transaction(fn ->
-      locked = lock_user(user)
-
-      with {:ok, user} <- maybe_apply_handle(locked, params),
-           {:ok, user} <- maybe_update_display_name(user, params) do
-        user
-      else
-        {:error, reason} -> Repo.rollback(reason)
+    transact(fn ->
+      with {:ok, user} <- user |> lock_user() |> maybe_apply_handle(params) do
+        maybe_update_display_name(user, params)
       end
     end)
   end
@@ -518,7 +527,7 @@ defmodule Openmaru.Accounts do
         {:ok, user}
 
       {:error, changeset} ->
-        if Enum.any?(changeset.errors, &match?({:handle, {_, [{:constraint, :unique} | _]}}, &1)),
+        if handle_taken?(changeset),
           do: {:error, Error.new(:handle_taken, "Handle is taken")},
           else: {:error, changeset}
     end
@@ -529,6 +538,12 @@ defmodule Openmaru.Accounts do
   end
 
   defp apply_handle(_user, _handle), do: handle_immutable()
+
+  defp handle_taken?(changeset) do
+    Enum.any?(changeset.errors, fn {field, {_message, opts}} ->
+      field == :handle and opts[:constraint] == :unique
+    end)
+  end
 
   defp handle_immutable do
     {:error,
@@ -623,9 +638,9 @@ defmodule Openmaru.Accounts do
 
   @doc """
   Deletes challenges past their expiry and sessions that expired or were revoked more
-  than a day ago. Returns the number of rows deleted.
+  than a day ago. Returns the number of rows deleted per table.
   """
-  @spec prune() :: non_neg_integer()
+  @spec prune() :: %{challenges: non_neg_integer(), sessions: non_neg_integer()}
   def prune do
     now = Clock.now()
     day_ago = DateTime.add(now, -24 * 3600, :second)
@@ -638,7 +653,7 @@ defmodule Openmaru.Accounts do
           where: s.expires_at <= ^now or (not is_nil(s.revoked_at) and s.revoked_at <= ^day_ago)
       )
 
-    challenges + sessions
+    %{challenges: challenges, sessions: sessions}
   end
 
   ## Challenges
@@ -679,6 +694,16 @@ defmodule Openmaru.Accounts do
   defp scope_user(query, user_id), do: where(query, [c], c.user_id == ^user_id)
 
   ## Helpers
+
+  # Runs `fun` in a transaction; an `{:error, reason}` result rolls it back.
+  defp transact(fun) do
+    Repo.transaction(fn ->
+      case fun.() do
+        {:ok, value} -> value
+        {:error, reason} -> Repo.rollback(reason)
+      end
+    end)
+  end
 
   defp check_active(%User{} = user, method, meta) do
     if User.suspended?(user) do

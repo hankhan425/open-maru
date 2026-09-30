@@ -2,6 +2,8 @@ defmodule Openmaru.ObanTest do
   use Openmaru.DataCase, async: true
   use Oban.Testing, repo: Openmaru.Repo
 
+  alias Oban.Cron.Expression
+
   defmodule ProbeWorker do
     @moduledoc false
     use Oban.Worker, queue: :default
@@ -23,7 +25,7 @@ defmodule Openmaru.ObanTest do
 
     # Later tasks add schedules (C01: auth cleanup); every entry must name an Oban worker.
     for {expression, worker} <- cron[:crontab] do
-      assert {:ok, _} = Oban.Cron.Expression.parse(expression)
+      assert {:ok, _} = Expression.parse(expression)
       assert Code.ensure_loaded?(worker) and function_exported?(worker, :perform, 1)
     end
   end

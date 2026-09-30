@@ -19,6 +19,7 @@ defmodule OpenmaruWeb.Plugs.CSRF do
   alias Openmaru.Accounts.UserSession
   alias Openmaru.Error
   alias OpenmaruWeb.FallbackController
+  alias Plug.Crypto.KeyGenerator
 
   @header "x-csrf-token"
   @mutations ~w(POST PUT PATCH DELETE)
@@ -49,7 +50,7 @@ defmodule OpenmaruWeb.Plugs.CSRF do
   @doc "The CSRF token for `session`."
   @spec token(Plug.Conn.t(), UserSession.t()) :: String.t()
   def token(conn, %UserSession{token_hash: token_hash}) do
-    key = Plug.Crypto.KeyGenerator.generate(conn.secret_key_base, @salt, cache: Plug.Crypto.Keys)
+    key = KeyGenerator.generate(conn.secret_key_base, @salt, cache: Plug.Crypto.Keys)
 
     :hmac
     |> :crypto.mac(:sha256, key, token_hash)

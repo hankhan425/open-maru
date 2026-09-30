@@ -1,6 +1,8 @@
 defmodule OpenmaruWeb.Auth.MeControllerTest do
   use OpenmaruWeb.ConnCase, async: true
 
+  import OpenApiSpex.TestAssertions
+
   alias Openmaru.Accounts.User
   alias Openmaru.Repo
   alias OpenmaruWeb.Auth.UserJSON
@@ -173,6 +175,24 @@ defmodule OpenmaruWeb.Auth.MeControllerTest do
       assert body["email"] == "alice@example.com"
       assert body["platform_role"] == "user"
       assert {:ok, _, 0} = DateTime.from_iso8601(body["created_at"])
+    end
+
+    test "C01-T12 the auth routes are documented and /me matches the User schema", %{conn: conn} do
+      spec = OpenmaruWeb.ApiSpec.spec()
+
+      for path <- ~w(/api/v1/auth/passkey/register/options /api/v1/auth/passkey/register
+                     /api/v1/auth/passkey/login/options /api/v1/auth/passkey/login
+                     /api/v1/auth/oauth/{provider} /api/v1/auth/oauth/{provider}/callback
+                     /api/v1/auth/csrf /api/v1/auth/logout /api/v1/me) do
+        assert Map.has_key?(spec.paths, path), "#{path} missing from the OpenAPI document"
+      end
+
+      user = insert!(:user, handle: "alice", email: nil)
+      body = conn |> sign_in(user) |> get(~p"/api/v1/me") |> json_response(200)
+      assert_schema(body, "User", spec)
+
+      anonymous = %{UserJSON.user(user, nil) | created_at: DateTime.to_iso8601(user.inserted_at)}
+      assert_schema(Jason.decode!(Jason.encode!(anonymous)), "User", spec)
     end
 
     test "C01-T12 user JSON has no email for other viewers" do
