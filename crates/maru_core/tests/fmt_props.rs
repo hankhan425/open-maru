@@ -67,12 +67,9 @@ fn touches(kind: &TokenKind) -> bool {
     )
 }
 
-/// `digits` with up to two leading zeros (when `zeros`) and random single `_` separators.
-fn regroup(digits: &str, zeros: bool, ch: &mut Choices) -> String {
-    let mut s = String::new();
-    if zeros {
-        s.push_str(ch.one_of(&["", "", "", "0", "00"]));
-    }
+/// `digits` with up to two leading zeros and random single `_` separators.
+fn regroup(digits: &str, ch: &mut Choices) -> String {
+    let mut s = ch.one_of(&["", "", "", "0", "00"]).to_string();
     s.push_str(digits);
     let mut out = String::new();
     for (i, c) in s.chars().enumerate() {
@@ -84,9 +81,9 @@ fn regroup(digits: &str, zeros: bool, ch: &mut Choices) -> String {
     out
 }
 
-/// A token's text, rewritten in an equivalent way: numbers regrouped, money and count
-/// numbers with leading zeros, money fractions padded with zeros. Metric values (after a
-/// comparator or `-`) keep their digits, since the AST keeps them as text.
+/// A token's text, rewritten in an equivalent way: numbers regrouped and given leading
+/// zeros (the parser drops them, OQ-9), money fractions padded with zeros. Metric
+/// fractions keep their digits, since the AST keeps them as text.
 fn token_text(
     src: &str,
     span: Span,
@@ -94,21 +91,10 @@ fn token_text(
     prev: Option<&TokenKind>,
     ch: &mut Choices,
 ) -> String {
-    let metric = matches!(
-        prev,
-        Some(
-            TokenKind::Ge
-                | TokenKind::Gt
-                | TokenKind::Le
-                | TokenKind::Lt
-                | TokenKind::EqEq
-                | TokenKind::Minus
-        )
-    );
     let money = prev == Some(&TokenKind::Keyword(Keyword::Usd));
     match kind {
         TokenKind::Int(digits) => {
-            let mut s = regroup(digits, !metric, ch);
+            let mut s = regroup(digits, ch);
             if money && ch.pick(3) == 2 {
                 s.push_str(ch.one_of(&[".0", ".00", ".000000"]));
             }
@@ -121,14 +107,10 @@ fn token_text(
                     frac.push('0');
                 }
             }
-            format!("{}.{frac}", regroup(int, !metric, ch))
+            format!("{}.{frac}", regroup(int, ch))
         }
         TokenKind::Duration { value, unit } => {
-            format!(
-                "{}{}",
-                regroup(&value.to_string(), true, ch),
-                unit.as_char()
-            )
+            format!("{}{}", regroup(&value.to_string(), ch), unit.as_char())
         }
         _ => src[span.range()].to_string(),
     }

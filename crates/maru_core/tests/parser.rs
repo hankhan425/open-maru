@@ -799,6 +799,29 @@ fn l01_integer_above_maximum_is_e103() {
     assert!(matches!(last_goal_item(&f), GoalItem::Success(s) if s.value.int == n));
 }
 
+// L01 extra (OQ-9): a metric value's integer part loses its leading zeros, keeping one
+// digit, so `010` and `10` are the same AST; the sign and fraction digits stay as written.
+#[test]
+fn l01_metric_values_drop_leading_zeros() {
+    let cases: &[(&str, bool, &str, Option<&str>)] = &[
+        ("007", false, "7", None),
+        ("0_010", false, "10", None),
+        ("000", false, "0", None),
+        ("0", false, "0", None),
+        ("-007.50", true, "7", Some("50")),
+        ("00.250", false, "0", Some("250")),
+        ("-0", true, "0", None),
+    ];
+    for &(value, negative, int, frac) in cases {
+        let f = parse_ok(&goal_with(&format!("    success: metric(wau) >= {value}")));
+        let item = last_goal_item(&f);
+        assert!(
+            success_is(item, Cmp::Ge, negative, int, frac, false),
+            "{value} parsed to {item:#?}"
+        );
+    }
+}
+
 // L01 extra: diagnostics are sorted by position.
 #[test]
 fn l01_diagnostics_are_sorted_by_position() {

@@ -363,12 +363,17 @@ fn l02_durations_and_dates() {
     assert!(has_line(&out, line), "{out}");
 }
 
-// L02 extra: metric digits are kept as written apart from grouping, because the AST keeps
-// them as text (`Signed`) and the formatter must preserve it.
+// L02 extra (OQ-9): a metric value loses the leading zeros of its integer part, so
+// `010` and `10` format (and hash) the same; its fraction digits are kept as written,
+// because the AST keeps them as text (`Signed`).
 #[test]
-fn l02_metric_values_keep_their_digits() {
+fn l02_metric_values_drop_leading_zeros() {
     for (input, want) in [
-        ("0010000", "0_010_000"),
+        ("0010000", "10_000"),
+        ("010", "10"),
+        ("000", "0"),
+        ("-007.50", "-7.50"),
+        ("00.25", "0.25"),
         ("-0", "-0"),
         ("12.50", "12.50"),
         ("1.000", "1.000"),
@@ -377,6 +382,8 @@ fn l02_metric_values_keep_their_digits() {
         let line = format!("success: metric(m) == {want}");
         assert!(has_line(&out, &line), "{input} → {want}:\n{out}");
     }
+    let hash = |n: &str| source_hash(&goal_with(&format!("    success: metric(m) >= {n}")));
+    assert_eq!(hash("010").unwrap(), hash("10").unwrap());
 }
 
 // L02 extra: counts keep their value; leading zeros and threshold numbers are normalized.

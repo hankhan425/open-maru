@@ -163,7 +163,8 @@ pub fn money() -> impl Strategy<Value = Money> {
 pub fn signed() -> impl Strategy<Value = Signed> {
     (
         any::<bool>(),
-        "[0-9]{1,24}",
+        // The parser drops leading zeros from the integer part (OQ-9).
+        "0|[1-9][0-9]{0,23}",
         prop::option::of("[0-9]{1,10}"),
     )
         .prop_map(|(negative, int, frac)| Signed {
