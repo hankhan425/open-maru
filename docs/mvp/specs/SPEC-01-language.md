@@ -21,7 +21,7 @@ Canonical example: `examples/lumen.maru`. Its golden charter: `examples/lumen.ch
 | `STRING` | `"…"`, escapes `\"` `\\` `\n`, no raw newline (E108), max 500 chars after unescaping (E108) |
 | `INT` | `[0-9]+` with optional single `_` between digit groups (`12_000`); no leading/trailing/double `_` (E103); as a count (seats, sponsors, approval count, threshold) at most 2_147_483_647 (E103) |
 | `DECIMAL` | `INT "." [0-9]+` (money allows max 6 fractional digits — E311) |
-| `SIGNED` | optional `-` then `INT` or `DECIMAL` (metric values only) |
+| `SIGNED` | optional `-` then `INT` or `DECIMAL` (metric values only); leading zeros of the integer part are not significant (`010` = `10`) |
 | `DURATION` | `INT` + unit `m` (minutes), `h`, `d`, `w` (7d), `y` (365d). Must be > 0 (E319) and at most 100 years (E104). (E104) |
 | `DATE` | `YYYY-MM-DD`, valid Gregorian date, years 2000–2999 (E105) |
 | `THRESHOLD` | `INT "/" INT` (fraction, 0 < a/b ≤ 1) or `INT "%"` (1–100) (E308) |
@@ -136,7 +136,7 @@ Parsing is error-tolerant: on a syntax error inside a block, the parser skips to
 - Money is integer micro-USD. `usd 12.50` = 12_500_000. Max per literal 9_007_199_254_740_991 micros (E310). Must be > 0 (E309).
 - Periods are UTC calendar periods: day; ISO week starting Monday 00:00; month starting on the 1st 00:00.
 - Durations: `m`=60s, `h`=3600s, `d`=86400s, `w`=604800s, `y`=31536000s. At most 100 years = 3_153_600_000 s in any unit (`36500d` and `5214w` pass, `5215w` fails; E104), so every deadline and term end computed from a spec stays within the date range of Elixir, Postgres and JS.
-- Counts (`seats`, `sponsors`, approval counts, threshold numbers) are at most 2_147_483_647 (E103), so they fit a Postgres `integer` and a JS number. Metric values have no limit (the IR keeps them as strings).
+- Counts (`seats`, `sponsors`, approval counts, threshold numbers) are at most 2_147_483_647 (E103), so they fit a Postgres `integer` and a JS number. Metric values have no limit (the IR keeps them as strings, without leading zeros in the integer part).
 
 ## 5. Static checks
 
@@ -254,7 +254,7 @@ For each goal, `unapproved_monthly_max_micros` is an upper bound on spend possib
 - 2-space indentation; one item per line; lists on one line separated by `, `.
 - Blank lines: exactly one blank line before and after every block item (`circle`, `agent`, `goal`, `mandate`), and one before the first `rule` that follows a non-rule item. Never a blank line at the start or end of an enclosing block, never two in a row, none elsewhere. The blank line goes above an item's leading comments, and comments before a block's `}` count as content that follows: a block item just before them is set off by a blank line. An empty block without comments is written `{}`.
 - Item order is preserved (the formatter never reorders).
-- Numeric literals (money, counts, metric values): the integer part is grouped with `_` by thousands **iff it has 4 or more digits** (`12000` → `12_000`, `4000` → `4_000`, `500` stays `500`, `1_0` → `10`). Money fractions: trailing zeros trimmed but at least 2 digits if any fraction remains (`12.5` → `12.50`, `3.000100` → `3.0001`, `7.00` → `7`). Threshold numbers are counts (`vote(core, 1_000/3_000)`). Metric values keep their digits as written apart from that grouping (leading zeros and fraction digits stay, because the AST and IR keep metric values as text: `-1500.5` → `-1_500.5`, `12.50` stays). Durations and dates are not grouped; a duration is its count without leading zeros followed by its unit (`007d` → `7d`, `36_500d` → `36500d`).
+- Numeric literals (money, counts, metric values): the integer part is grouped with `_` by thousands **iff it has 4 or more digits** (`12000` → `12_000`, `4000` → `4_000`, `500` stays `500`, `1_0` → `10`). Money fractions: trailing zeros trimmed but at least 2 digits if any fraction remains (`12.5` → `12.50`, `3.000100` → `3.0001`, `7.00` → `7`). Threshold numbers are counts (`vote(core, 1_000/3_000)`). Metric values are grouped the same way and lose the leading zeros of their integer part, so `010` and `10` hash the same; their fraction digits stay as written, because the AST and IR keep metric values as text (`-1500.5` → `-1_500.5`, `-007.50` → `-7.50`, `12.50` stays). Durations and dates are not grouped; a duration is its count without leading zeros followed by its unit (`007d` → `7d`, `36_500d` → `36500d`).
 - Spacing: `key: value`; `usd 12_000 / month`; `vote(core, 2/3)`; operators surrounded by single spaces.
 - Comments: full-line comments stay attached above the following item at that item's indentation; trailing comments stay on their line after one space. A comment after `{` stays on that line; comments before `}` stay inside the block at item indentation; a comment written between the tokens of one item moves above that item. Trailing whitespace in comments is removed.
 - Text: LF line endings (CRLF input is normalized), no trailing whitespace, exactly one final newline. Strings are written with the canonical escapes `\"`, `\\`, `\n`.

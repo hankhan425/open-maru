@@ -192,7 +192,7 @@ ARCHITECTURE > PRD.
 
 ### OQ-9: Leading zeros in metric values and the spec hash
 - **Task:** L02
-- **Status:** open
+- **Status:** resolved
 - **Conflict:** SPEC-01 §1 says formatting-only edits never change the spec hash, and §7 requires
   the formatter to preserve the AST. L01's AST keeps a metric value's digits as text
   (`ast::Signed`, because the IR keeps metric values as strings, §4.8), so
@@ -207,4 +207,8 @@ ARCHITECTURE > PRD.
 - **Chosen (interim):** (a). L02 keeps metric digits apart from `_` grouping (SPEC-01 §7) and
   `l02_metric_values_keep_their_digits` pins it. Option (b) is an L01 parser change plus an L02
   test update.
-- **Resolution:**
+- **Resolution:** (b), leading zeros only: the parser drops leading zeros from a metric
+  value's integer part, keeping one digit (`ast::Signed::int`), so `010` and `10` parse,
+  format and hash the same. Fraction digits stay as written (`12.50` ≠ `12.5`). SPEC-01 §2,
+  §4.8 and §7 are updated; tests `l01_metric_values_drop_leading_zeros` and
+  `l02_metric_values_drop_leading_zeros`.
