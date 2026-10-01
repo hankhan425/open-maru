@@ -187,7 +187,7 @@ Spans: E301, E302, E303, E312, E315 and E317 point at the identifier or handle; 
 | E319 | error | Duration must be > 0 |
 | E322 | error | `approve(members, …)` is not allowed |
 | E323 | error | Duplicate holder in a circle |
-| E324 | error | `seats` or `invite(sponsors: …)` is 0 (OQ-10, interim) |
+| E324 | error | `seats` or `invite(sponsors: …)` is 0 |
 | W401 | warning | Mandate `expires` is in the past: `opts.now` is at or after `DATE`T00:00:00Z (only with `opts.now`) |
 | W402 | warning | `else allow` on a rule or `amend` |
 | W403 | warning | A mandate's spend limit for a category exceeds the goal's `fund` normalized to the same period (both converted to a month with the §6.1 factors: `usd 50 / day` is 1,550 a month; a `once` fund never warns) |
@@ -214,7 +214,7 @@ Stable JSON consumed by server, web, CLI. `ir_version: 1`. Arrays preserve sourc
     "name": "Lumen Studio",
     "purpose": "Build and maintain an open, browser-based image editor.",
     "membership": {"kind": "invite", "sponsors": 1},
-    "amend": {"procedure": {"kind": "vote", "circle": "core", "threshold": {"num": 2, "den": 3}},
+    "amend": {"procedure": {"kind": "vote", "circle": "core", "threshold": {"num": 2, "den": 3, "percent": false}},
               "within": {"value": 7, "unit": "d", "secs": 604800}, "else": "deny"},
     "circles": [{"id": "core", "seats": 3, "term": {"value": 1, "unit": "y", "secs": 31536000}, "holders": ["mina", "jo"]}],
     "agents": [{"id": "builder", "operator": "mina", "runtime": "hosted"}],
@@ -248,7 +248,7 @@ Stable JSON consumed by server, web, CLI. `ir_version: 1`. Arrays preserve sourc
   }
 }
 ```
-Thresholds are stored as fractions: `60%` → `{"num":60,"den":100}` (not reduced); `2/4` stays `{"num":2,"den":4}`. Durations keep their source unit (`{"value":48,"unit":"h","secs":172800}`) so the charter can say "48 hours". `term` is `null` when absent. Defaults are materialized in the IR (never absent); the default timeout is `{"value":7,"unit":"d","secs":604800}`.
+Thresholds are stored as fractions with the form they were written in: `60%` → `{"num":60,"den":100,"percent":true}` (not reduced); `2/4` stays `{"num":2,"den":4,"percent":false}`, so the charter can say "60%" or "2/4" as written. Durations keep their source unit (`{"value":48,"unit":"h","secs":172800}`) so the charter can say "48 hours". `term` is `null` when absent. Defaults are materialized in the IR (never absent); the default timeout is `{"value":7,"unit":"d","secs":604800}`.
 
 The full shape is `crates/maru_core/schema/ir.v1.json` (JSON Schema 2020-12; every field required, no other fields). Beyond the excerpt:
 - Every field is always present. Optional values without a default are `null`: org and goal `purpose`, `term`, `fund`, `success`, `success.by`, `per_request_micros`, `expires`. Lists are `[]` when empty.
@@ -260,7 +260,6 @@ The full shape is `crates/maru_core/schema/ir.v1.json` (JSON Schema 2020-12; eve
 - Rule subjects: `{"kind":"spend","category":"llm"|"compute"|"expense"|null,"over_micros":X|null}` or `{"kind":"close"}`.
 - `capabilities`: `claim_tasks`, `create_tasks`, `post_evidence`, `report_metric:<name>`, in source order without repeats (W408).
 - Handles (holders, operators, person principals) are written without `@`.
-- Threshold objects also carry `"percent": true|false`, whether the threshold was written as `p%` (OQ-11, interim; the excerpt above predates it).
 
 ### 6.1 Limits analysis
 For each goal, `unapproved_monthly_max_micros` is an upper bound on spend possible in one calendar month with no approvals:

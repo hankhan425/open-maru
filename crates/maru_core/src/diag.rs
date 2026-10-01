@@ -72,7 +72,7 @@ codes! {
     E319: "Duration must be > 0.",
     E322: "`approve(members, …)` is not allowed.",
     E323: "Duplicate holder in a circle.",
-    E324: "`seats` or `sponsors` is 0 (OQ-10).",
+    E324: "`seats` or `sponsors` is 0.",
     W401: "Mandate `expires` is in the past.",
     W402: "`else allow` on a rule or `amend`.",
     W403: "A mandate's spend limit exceeds the goal's `fund` for the same period.",

@@ -215,7 +215,7 @@ ARCHITECTURE > PRD.
 
 ### OQ-10: No code for `seats: 0` and `invite(sponsors: 0)`
 - **Task:** L03
-- **Status:** open
+- **Status:** resolved
 - **Conflict:** SPEC-01 §4.2 says `seats` is "required, ≥ 1" and §4.1 says `invite(sponsors: N)`
   needs "N ≥ 1", but the §5 table has no code for either. The parser accepts `0` (it bounds
   counts only from above, E103), so without a check `seats: 0` passes when the circle has no
@@ -229,11 +229,13 @@ ARCHITECTURE > PRD.
   `l03_seats_and_sponsors_must_be_at_least_one`); a circle with `seats: 0` is not also
   compared with its holders (E306) or approval counts (E307). The §5 table lists E324 as
   interim.
-- **Resolution:**
+- **Resolution:** (a), the interim choice. E324 is in the SPEC-01 §5 table as a regular code;
+  like E309 and E319 it names the one value that must be positive, and it keeps E307 about
+  approvals.
 
 ### OQ-11: The IR cannot tell `60%` from `60/100`
 - **Task:** L03 (affects L04, L05)
-- **Status:** open
+- **Status:** resolved
 - **Conflict:** SPEC-01 §6 stores thresholds as unreduced fractions, `60%` →
   `{"num":60,"den":100}`, and its lumen excerpt shows `{"num":2,"den":3}`. The charter (§8)
   renders "percents `60%`" but "other fractions `a/b`", and L04's helper is
@@ -246,4 +248,6 @@ ARCHITECTURE > PRD.
 - **Chosen (interim):** (a). `ir::Threshold { num, den, percent }`; the golden
   `tests/snapshots/lumen.ir.json` has `"percent": false` for both `2/3`s, and the schema
   requires the field. SPEC-01 §6 notes the field as interim; its excerpt is unchanged.
-- **Resolution:**
+- **Resolution:** (a), the interim choice. SPEC-01 §6 now shows `percent` in the lumen excerpt
+  and in the threshold examples (`60%` → `{"num":60,"den":100,"percent":true}`), so the
+  charter renders a threshold as written (L04's `threshold(num, den, is_percent)`).
