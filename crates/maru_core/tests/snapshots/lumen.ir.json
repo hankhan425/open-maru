@@ -1,0 +1,184 @@
+{
+  "ir_version": 1,
+  "source_hash": "sha256:5abc7fefcaa0af2efe04b1b5d40196ea10ec95db1a7d6e609e51d840086f8a83",
+  "org": {
+    "name": "Lumen Studio",
+    "purpose": "Build and maintain an open, browser-based image editor.",
+    "membership": {
+      "kind": "invite",
+      "sponsors": 1
+    },
+    "amend": {
+      "procedure": {
+        "kind": "vote",
+        "circle": "core",
+        "threshold": {
+          "num": 2,
+          "den": 3,
+          "percent": false
+        }
+      },
+      "within": {
+        "value": 7,
+        "unit": "d",
+        "secs": 604800
+      },
+      "else": "deny"
+    },
+    "circles": [
+      {
+        "id": "core",
+        "seats": 3,
+        "term": {
+          "value": 1,
+          "unit": "y",
+          "secs": 31536000
+        },
+        "holders": [
+          "mina",
+          "jo"
+        ]
+      }
+    ],
+    "agents": [
+      {
+        "id": "builder",
+        "operator": "mina",
+        "runtime": "hosted"
+      }
+    ],
+    "goals": [
+      {
+        "id": "editor",
+        "title": "Open cloud image editor",
+        "purpose": "Ship a usable editor with layers, masks and export.",
+        "steward": "core",
+        "fund": {
+          "amount_micros": 12000000000,
+          "period": "month"
+        },
+        "on_underfunded": "pause",
+        "on_close": {
+          "kind": "return_treasury"
+        },
+        "success": {
+          "metric": "weekly_active_users",
+          "cmp": ">=",
+          "value": "10000",
+          "by": "2027-06-30"
+        },
+        "mandates": [
+          {
+            "principal": {
+              "kind": "agent",
+              "id": "builder"
+            },
+            "spend": [
+              {
+                "category": "llm",
+                "limit_micros": 4000000000,
+                "period": "month"
+              },
+              {
+                "category": "compute",
+                "limit_micros": 1000000000,
+                "period": "month"
+              }
+            ],
+            "per_request_micros": 25000000,
+            "capabilities": [
+              "claim_tasks",
+              "post_evidence",
+              "report_metric:weekly_active_users"
+            ],
+            "expires": "2027-01-01"
+          },
+          {
+            "principal": {
+              "kind": "person",
+              "id": "jo"
+            },
+            "spend": [
+              {
+                "category": "expense",
+                "limit_micros": 500000000,
+                "period": "month"
+              }
+            ],
+            "per_request_micros": null,
+            "capabilities": [
+              "claim_tasks",
+              "create_tasks",
+              "post_evidence"
+            ],
+            "expires": null
+          }
+        ],
+        "rules": [
+          {
+            "id": "editor:r_866679bf",
+            "subject": {
+              "kind": "spend",
+              "category": null,
+              "over_micros": 500000000
+            },
+            "procedure": {
+              "kind": "approve",
+              "circle": "core",
+              "count": 1
+            },
+            "within": {
+              "value": 48,
+              "unit": "h",
+              "secs": 172800
+            },
+            "else": "deny"
+          },
+          {
+            "id": "editor:r_91607479",
+            "subject": {
+              "kind": "spend",
+              "category": "expense",
+              "over_micros": null
+            },
+            "procedure": {
+              "kind": "approve",
+              "circle": "core",
+              "count": 1
+            },
+            "within": {
+              "value": 7,
+              "unit": "d",
+              "secs": 604800
+            },
+            "else": "deny"
+          },
+          {
+            "id": "editor:r_88a71a96",
+            "subject": {
+              "kind": "close"
+            },
+            "procedure": {
+              "kind": "vote",
+              "circle": "core",
+              "threshold": {
+                "num": 2,
+                "den": 3,
+                "percent": false
+              }
+            },
+            "within": {
+              "value": 7,
+              "unit": "d",
+              "secs": 604800
+            },
+            "else": "deny"
+          }
+        ],
+        "limits": {
+          "unapproved_monthly_max_micros": 5000000000
+        }
+      }
+    ]
+  }
+}
