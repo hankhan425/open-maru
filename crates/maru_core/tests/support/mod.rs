@@ -1,6 +1,7 @@
 //! Shared helpers for maru_core language tests.
 #![allow(dead_code)]
 
+pub mod checking;
 pub mod printer;
 pub mod strategies;
 

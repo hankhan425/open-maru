@@ -38,17 +38,23 @@ pub fn format(src: &str) -> Result<String, Vec<Diagnostic>> {
         Some(file) if !out.diagnostics.iter().any(Diagnostic::is_error) => file,
         _ => return Err(out.diagnostics),
     };
-    let formatted = format_file(&file);
+    format_ast(&file).map_err(|d| vec![d])
+}
+
+/// Formats a parsed file, or E109 when the result would exceed [`MAX_SOURCE_BYTES`]. The
+/// checker uses it to hash the tree it has already parsed.
+pub(crate) fn format_ast(file: &File) -> Result<String, Diagnostic> {
+    let formatted = format_file(file);
     if formatted.len() > MAX_SOURCE_BYTES {
         let message = format!(
             "formatted source is {} bytes; the maximum is {MAX_SOURCE_BYTES} bytes (256 KiB)",
             formatted.len()
         );
-        return Err(vec![Diagnostic::new(
+        return Err(Diagnostic::new(
             Code::E109,
             message,
             Span::point(Pos::START),
-        )]);
+        ));
     }
     Ok(formatted)
 }
@@ -60,15 +66,19 @@ pub fn format(src: &str) -> Result<String, Vec<Diagnostic>> {
 ///
 /// Whatever [`format`] returns.
 pub fn source_hash(src: &str) -> Result<String, Vec<Diagnostic>> {
+    Ok(format!("sha256:{}", sha256_hex(&format(src)?)))
+}
+
+/// Lowercase hex SHA-256 of `text`.
+pub(crate) fn sha256_hex(text: &str) -> String {
     const HEX: &[u8; 16] = b"0123456789abcdef";
-    let digest = Sha256::digest(format(src)?.as_bytes());
-    let mut out = String::with_capacity(7 + 2 * digest.len());
-    out.push_str("sha256:");
+    let digest = Sha256::digest(text.as_bytes());
+    let mut out = String::with_capacity(2 * digest.len());
     for byte in digest {
         out.push(char::from(HEX[usize::from(byte >> 4)]));
         out.push(char::from(HEX[usize::from(byte & 0x0f)]));
     }
-    Ok(out)
+    out
 }
 
 /// The canonical text of a rule: its formatted line without indentation or comments,

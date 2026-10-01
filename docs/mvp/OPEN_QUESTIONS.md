@@ -212,3 +212,42 @@ ARCHITECTURE > PRD.
   format and hash the same. Fraction digits stay as written (`12.50` ≠ `12.5`). SPEC-01 §2,
   §4.8 and §7 are updated; tests `l01_metric_values_drop_leading_zeros` and
   `l02_metric_values_drop_leading_zeros`.
+
+### OQ-10: No code for `seats: 0` and `invite(sponsors: 0)`
+- **Task:** L03
+- **Status:** resolved
+- **Conflict:** SPEC-01 §4.2 says `seats` is "required, ≥ 1" and §4.1 says `invite(sponsors: N)`
+  needs "N ≥ 1", but the §5 table has no code for either. The parser accepts `0` (it bounds
+  counts only from above, E103), so without a check `seats: 0` passes when the circle has no
+  holders and is not referenced, and `sponsors: 0` reaches the IR, where C03's sponsoring
+  would let anyone join with no sponsor (the same as `open()`, written differently).
+- **Options:** (a) a new code, E324 "`seats` or `sponsors` is 0", like E309 (money) and E319
+  (durations) for their types; (b) widen E307 ("approve count < 1 or > seats") to every count
+  that must be ≥ 1; (c) have the parser reject `0` in these two positions as E103; (d) accept
+  `0` (seats 0 then fails only through E306/E307/E317, sponsors 0 means open).
+- **Chosen (interim):** (a). `Code::E324` at the number (L03 extra test
+  `l03_seats_and_sponsors_must_be_at_least_one`); a circle with `seats: 0` is not also
+  compared with its holders (E306) or approval counts (E307). The §5 table lists E324 as
+  interim.
+- **Resolution:** (a), the interim choice. E324 is in the SPEC-01 §5 table as a regular code;
+  like E309 and E319 it names the one value that must be positive, and it keeps E307 about
+  approvals.
+
+### OQ-11: The IR cannot tell `60%` from `60/100`
+- **Task:** L03 (affects L04, L05)
+- **Status:** resolved
+- **Conflict:** SPEC-01 §6 stores thresholds as unreduced fractions, `60%` →
+  `{"num":60,"den":100}`, and its lumen excerpt shows `{"num":2,"den":3}`. The charter (§8)
+  renders "percents `60%`" but "other fractions `a/b`", and L04's helper is
+  `threshold(num, den, is_percent)`; the IR is the charter's only input, so `vote(c, 60%)` and
+  `vote(c, 60/100)` would render the same.
+- **Options:** (a) add `"percent": true|false` to every threshold object; (b) no flag: the
+  charter treats every `den == 100` as a percentage (`60/100` reads "60%"); (c) a separate
+  shape for percentages, e.g. `{"percent":60}`, which every consumer then has to handle
+  twice.
+- **Chosen (interim):** (a). `ir::Threshold { num, den, percent }`; the golden
+  `tests/snapshots/lumen.ir.json` has `"percent": false` for both `2/3`s, and the schema
+  requires the field. SPEC-01 §6 notes the field as interim; its excerpt is unchanged.
+- **Resolution:** (a), the interim choice. SPEC-01 §6 now shows `percent` in the lumen excerpt
+  and in the threshold examples (`60%` → `{"num":60,"den":100,"percent":true}`), so the
+  charter renders a threshold as written (L04's `threshold(num, den, is_percent)`).
