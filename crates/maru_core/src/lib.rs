@@ -9,12 +9,14 @@
 pub mod ast;
 pub mod diag;
 mod error;
+pub mod fmt;
 pub mod lexer;
 pub mod parser;
 pub mod span;
 
 pub use diag::{Code, Diagnostic, Severity};
 pub use error::CoreError;
+pub use fmt::{format, source_hash};
 pub use parser::{ParseOutput, parse};
 pub use span::{Pos, Span};
 

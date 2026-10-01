@@ -17,3 +17,9 @@ trim_trailing_whitespace = false
 [{justfile,Makefile}]
 indent_style = space
 indent_size = 4
+
+# L02: the messy formatter fixture keeps its trailing whitespace and tabs on purpose.
+[crates/maru_core/tests/fixtures/*.messy.maru]
+trim_trailing_whitespace = unset
+indent_style = unset
+insert_final_newline = unset

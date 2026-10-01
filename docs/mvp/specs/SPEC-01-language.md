@@ -7,7 +7,7 @@ Canonical example: `examples/lumen.maru`. Its golden charter: `examples/lumen.ch
 ## 1. Files
 
 - One org per file, extension `.maru`, UTF-8, LF line endings (CRLF accepted, normalized by formatter).
-- Maximum source size: 256 KiB (E109).
+- Maximum source size: 256 KiB (E109). The canonical formatted source (§7) must fit too.
 - The **spec hash** is `sha256:` + lowercase hex SHA-256 of the canonical formatted source (§7). Formatting-only edits never change the hash.
 
 ## 2. Lexical structure
@@ -21,7 +21,7 @@ Canonical example: `examples/lumen.maru`. Its golden charter: `examples/lumen.ch
 | `STRING` | `"…"`, escapes `\"` `\\` `\n`, no raw newline (E108), max 500 chars after unescaping (E108) |
 | `INT` | `[0-9]+` with optional single `_` between digit groups (`12_000`); no leading/trailing/double `_` (E103); as a count (seats, sponsors, approval count, threshold) at most 2_147_483_647 (E103) |
 | `DECIMAL` | `INT "." [0-9]+` (money allows max 6 fractional digits — E311) |
-| `SIGNED` | optional `-` then `INT` or `DECIMAL` (metric values only) |
+| `SIGNED` | optional `-` then `INT` or `DECIMAL` (metric values only); leading zeros of the integer part are not significant (`010` = `10`) |
 | `DURATION` | `INT` + unit `m` (minutes), `h`, `d`, `w` (7d), `y` (365d). Must be > 0 (E319) and at most 100 years (E104). (E104) |
 | `DATE` | `YYYY-MM-DD`, valid Gregorian date, years 2000–2999 (E105) |
 | `THRESHOLD` | `INT "/" INT` (fraction, 0 < a/b ≤ 1) or `INT "%"` (1–100) (E308) |
@@ -125,7 +125,7 @@ Parsing is error-tolerant: on a syntax error inside a block, the parser skips to
 - `rule spend [category] [> money] requires P [timeout]`: any spend matching the category (or any category if omitted) and strictly over the amount (or any amount if omitted) must be approved by decision P before it executes.
 - `rule close requires P [timeout]`: closing the goal requires decision P. Without such a rule, closing requires `approve(<steward>, 1)`.
 - Default timeout: `within 7d else deny`.
-- Rule identity: `"<goal_id>:r_" + first 8 hex chars of SHA-256(canonical rule text)` (canonical text = the formatted `rule …` line). Two rules with the same subject in one goal → E314.
+- Rule identity: `"<goal_id>:r_" + first 8 hex chars of SHA-256(canonical rule text)` (canonical text = the formatted `rule …` line without indentation or comments; `maru_core::fmt::rule_line`). Two rules with the same subject in one goal → E314.
 
 ### 4.7 Decision procedures
 - `approve(C, N)`: passes when N distinct effective holders of circle C approve. Fails early when rejections make N approvals impossible. `members` not allowed (E322). 1 ≤ N ≤ seats(C) (E307).
@@ -136,7 +136,7 @@ Parsing is error-tolerant: on a syntax error inside a block, the parser skips to
 - Money is integer micro-USD. `usd 12.50` = 12_500_000. Max per literal 9_007_199_254_740_991 micros (E310). Must be > 0 (E309).
 - Periods are UTC calendar periods: day; ISO week starting Monday 00:00; month starting on the 1st 00:00.
 - Durations: `m`=60s, `h`=3600s, `d`=86400s, `w`=604800s, `y`=31536000s. At most 100 years = 3_153_600_000 s in any unit (`36500d` and `5214w` pass, `5215w` fails; E104), so every deadline and term end computed from a spec stays within the date range of Elixir, Postgres and JS.
-- Counts (`seats`, `sponsors`, approval counts, threshold numbers) are at most 2_147_483_647 (E103), so they fit a Postgres `integer` and a JS number. Metric values have no limit (the IR keeps them as strings).
+- Counts (`seats`, `sponsors`, approval counts, threshold numbers) are at most 2_147_483_647 (E103), so they fit a Postgres `integer` and a JS number. Metric values have no limit (the IR keeps them as strings, without leading zeros in the integer part).
 
 ## 5. Static checks
 
@@ -154,7 +154,7 @@ Checking has two stages. The parser reports E1xx, E2xx, E310 and E311. If it rep
 | E106 | error | Invalid handle |
 | E107 | error | Invalid or reserved identifier |
 | E108 | error | String contains raw newline or exceeds 500 chars |
-| E109 | error | Source exceeds 256 KiB |
+| E109 | error | Source exceeds 256 KiB (the formatter also reports it when the formatted source would) |
 | E201 | error | Expected X, found Y |
 | E202 | error | Unexpected end of file |
 | E203 | error | Content after the org block |
@@ -252,13 +252,14 @@ For each goal, `unapproved_monthly_max_micros` is an upper bound on spend possib
 ## 7. Formatter
 
 - 2-space indentation; one item per line; lists on one line separated by `, `.
-- Blank lines: exactly one blank line before and after every block item (`circle`, `agent`, `goal`, `mandate`), and one before the first `rule` that follows a non-rule item. Never a blank line at the start or end of an enclosing block, never two in a row, none elsewhere.
+- Blank lines: exactly one blank line before and after every block item (`circle`, `agent`, `goal`, `mandate`), and one before the first `rule` that follows a non-rule item. Never a blank line at the start or end of an enclosing block, never two in a row, none elsewhere. The blank line goes above an item's leading comments, and comments before a block's `}` count as content that follows: a block item just before them is set off by a blank line. An empty block without comments is written `{}`.
 - Item order is preserved (the formatter never reorders).
-- Numeric literals (money, counts, metric values): the integer part is grouped with `_` by thousands **iff it has 4 or more digits** (`12000` → `12_000`, `4000` → `4_000`, `500` stays `500`, `1_0` → `10`). Money fractions: trailing zeros trimmed but at least 2 digits if any fraction remains (`12.5` → `12.50`, `3.000100` → `3.0001`, `7.00` → `7`).
+- Numeric literals (money, counts, metric values): the integer part is grouped with `_` by thousands **iff it has 4 or more digits** (`12000` → `12_000`, `4000` → `4_000`, `500` stays `500`, `1_0` → `10`). Money fractions: trailing zeros trimmed but at least 2 digits if any fraction remains (`12.5` → `12.50`, `3.000100` → `3.0001`, `7.00` → `7`). Threshold numbers are counts (`vote(core, 1_000/3_000)`). Metric values are grouped the same way and lose the leading zeros of their integer part, so `010` and `10` hash the same; their fraction digits stay as written, because the AST and IR keep metric values as text (`-1500.5` → `-1_500.5`, `-007.50` → `-7.50`, `12.50` stays). Durations and dates are not grouped; a duration is its count without leading zeros followed by its unit (`007d` → `7d`, `36_500d` → `36500d`).
 - Spacing: `key: value`; `usd 12_000 / month`; `vote(core, 2/3)`; operators surrounded by single spaces.
-- Comments: full-line comments stay attached above the following item at that item's indentation; trailing comments stay on their line after one space.
+- Comments: full-line comments stay attached above the following item at that item's indentation; trailing comments stay on their line after one space. A comment after `{` stays on that line; comments before `}` stay inside the block at item indentation; a comment written between the tokens of one item moves above that item. Trailing whitespace in comments is removed.
+- Text: LF line endings (CRLF input is normalized), no trailing whitespace, exactly one final newline. Strings are written with the canonical escapes `\"`, `\\`, `\n`.
 - Properties: idempotent (`fmt(fmt(x)) == fmt(x)`) and AST-preserving (`ast(fmt(x)) == ast(x)` ignoring spans and comments).
-- Files with syntax errors are not formatted (returns the diagnostics).
+- Files with syntax errors are not formatted (returns the diagnostics). If the formatted source would exceed 256 KiB, formatting fails with E109, so formatted output always parses again.
 
 ## 8. Charter rendering
 

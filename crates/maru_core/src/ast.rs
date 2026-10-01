@@ -586,7 +586,7 @@ pub struct Money {
 pub struct Signed {
     /// Whether it starts with `-`.
     pub negative: bool,
-    /// Integer digits, underscores removed.
+    /// Integer digits, underscores and leading zeros removed (at least one digit).
     pub int: String,
     /// Fraction digits after `.`, if any.
     pub frac: Option<String>,
