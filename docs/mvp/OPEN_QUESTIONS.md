@@ -189,3 +189,22 @@ ARCHITECTURE > PRD.
   sign-up (c) can be added after the MVP as its own task. Without the field there is no passkey
   autofill (conditional mediation); the passkey button opens the browser's passkey picker.
   SPEC-08 §3 and F01 are updated.
+
+### OQ-9: Leading zeros in metric values and the spec hash
+- **Task:** L02
+- **Status:** open
+- **Conflict:** SPEC-01 §1 says formatting-only edits never change the spec hash, and §7 requires
+  the formatter to preserve the AST. L01's AST keeps a metric value's digits as text
+  (`ast::Signed`, because the IR keeps metric values as strings, §4.8), so
+  `success: metric(m) >= 010` and `>= 10` are different ASTs. The formatter can only keep them
+  apart (`010` stays `010`, `12.50` stays `12.50`), which gives them different spec hashes,
+  although a reader would call the edit formatting-only. Counts and money have no such
+  issue: their values are numbers and the formatter normalizes them (`007` → `7`).
+- **Options:** (a) keep metric digits as written (a hash change for `010` → `10` is accepted);
+  (b) normalize in the parser: strip leading zeros of the integer part (keeping one digit) and,
+  optionally, trailing zeros of the fraction, so the AST, IR and formatter agree on one
+  spelling; (c) keep (a) and have the checker warn about leading zeros.
+- **Chosen (interim):** (a). L02 keeps metric digits apart from `_` grouping (SPEC-01 §7) and
+  `l02_metric_values_keep_their_digits` pins it. Option (b) is an L01 parser change plus an L02
+  test update.
+- **Resolution:**
