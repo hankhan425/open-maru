@@ -25,7 +25,7 @@ use crate::ir::{self, IR_VERSION, Ir};
 use crate::limits;
 use crate::parser::parse;
 use crate::span::Span;
-use crate::suggest::did_you_mean;
+use crate::suggest::Suggester;
 
 /// Options for [`check`].
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -139,10 +139,6 @@ impl<'a> Names<'a> {
     fn contains(&self, name: &str) -> bool {
         self.first.contains_key(name)
     }
-
-    fn suggest(&self, name: &str) -> Option<&'a str> {
-        did_you_mean(name, self.order.iter().copied())
-    }
 }
 
 /// Tracks single-valued fields of one block for E305.
@@ -209,7 +205,7 @@ fn count(n: &ast::Int) -> u32 {
 }
 
 /// The key that makes two rules' subjects the same (E314).
-#[derive(PartialEq, Eq)]
+#[derive(PartialEq, Eq, Hash)]
 enum SubjectKey {
     Close,
     Spend(Option<ast::Category>, Option<u64>),
@@ -225,6 +221,8 @@ struct Checker<'a> {
     goals: Names<'a>,
     /// Declared agents that hold a mandate somewhere (W406).
     agents_with_mandates: HashSet<&'a str>,
+    /// "Did you mean" lookups, under one work budget per check.
+    suggester: Suggester,
 }
 
 impl<'a> Checker<'a> {
@@ -238,6 +236,7 @@ impl<'a> Checker<'a> {
             agents: Names::default(),
             goals: Names::default(),
             agents_with_mandates: HashSet::new(),
+            suggester: Suggester::new(Suggester::CHECK_BUDGET),
         }
     }
 
@@ -611,9 +610,9 @@ impl<'a> Checker<'a> {
             _ => None,
         });
         let mut mandates = Vec::new();
-        let mut principals: Vec<(ir::PrincipalKind, &str, Span)> = Vec::new();
+        let mut principals: HashMap<(ir::PrincipalKind, &str), Span> = HashMap::new();
         let mut rules = Vec::new();
-        let mut subjects: Vec<(SubjectKey, Span)> = Vec::new();
+        let mut subjects: HashMap<SubjectKey, Span> = HashMap::new();
         for item in &g.body.items {
             match &item.node {
                 ast::GoalItem::Mandate(m) => {
@@ -676,7 +675,7 @@ impl<'a> Checker<'a> {
                     self.error(Code::E315, message, id.span);
                 } else if !self.goals.contains(&id.name) {
                     let others = self.goals.order.iter().copied().filter(|n| *n != g.id.name);
-                    let suggestion = did_you_mean(&id.name, others);
+                    let suggestion = self.suggester.did_you_mean(&id.name, others);
                     let d =
                         Diagnostic::new(Code::E315, format!("unknown goal `{}`", id.name), id.span);
                     self.report(did_you_mean_note(d, suggestion));
@@ -695,7 +694,7 @@ impl<'a> Checker<'a> {
         g: &ast::Goal,
         m: &'a ast::Mandate,
         fund_monthly: Option<u128>,
-        principals: &mut Vec<(ir::PrincipalKind, &'a str, Span)>,
+        principals: &mut HashMap<(ir::PrincipalKind, &'a str), Span>,
     ) -> ir::Mandate {
         let (kind, name, span, shown) = match &m.principal {
             ast::Principal::Agent(id) => {
@@ -713,18 +712,22 @@ impl<'a> Checker<'a> {
                 self.agents_with_mandates.insert(known);
             } else {
                 let d = Diagnostic::new(Code::E303, format!("unknown agent `{name}`"), span);
-                let suggestion = self.agents.suggest(name);
+                let suggestion = self
+                    .suggester
+                    .did_you_mean(name, self.agents.order.iter().copied());
                 self.report(did_you_mean_note(d, suggestion));
             }
         }
-        match principals.iter().find(|(k, n, _)| *k == kind && *n == name) {
-            Some((_, _, first)) => {
+        match principals.get(&(kind, name.as_str())) {
+            Some(first) => {
                 let message = format!("`{shown}` already has a mandate in goal `{}`", g.id.name);
                 let d = Diagnostic::new(Code::E312, message, span)
                     .with_note(at("first mandate", *first));
                 self.report(d);
             }
-            None => principals.push((kind, name, span)),
+            None => {
+                principals.insert((kind, name), span);
+            }
         }
 
         let mut fields = Fields::new(format!("the mandate for `{shown}`"));
@@ -806,28 +809,36 @@ impl<'a> Checker<'a> {
 
     /// The capabilities without repeats, in order; W408 for each repeat.
     fn capabilities(&mut self, caps: &[ast::Capability]) -> Vec<String> {
-        let mut first: Vec<(String, Span)> = Vec::new();
+        let mut names: Vec<String> = Vec::new();
+        let mut first: HashMap<String, Span> = HashMap::new();
         for c in caps {
-            let name = match &c.kind {
-                ast::CapabilityKind::ClaimTasks => "claim_tasks".to_string(),
-                ast::CapabilityKind::CreateTasks => "create_tasks".to_string(),
-                ast::CapabilityKind::PostEvidence => "post_evidence".to_string(),
-                ast::CapabilityKind::ReportMetric(m) => format!("report_metric:{}", m.name),
+            // The IR name, and the name as written for messages.
+            let (name, written) = match &c.kind {
+                ast::CapabilityKind::ClaimTasks => ("claim_tasks".to_string(), None),
+                ast::CapabilityKind::CreateTasks => ("create_tasks".to_string(), None),
+                ast::CapabilityKind::PostEvidence => ("post_evidence".to_string(), None),
+                ast::CapabilityKind::ReportMetric(m) => (
+                    format!("report_metric:{}", m.name),
+                    Some(format!("report_metric({})", m.name)),
+                ),
             };
-            match first.iter().find(|(n, _)| *n == name) {
-                Some((_, span)) => {
-                    let d = Diagnostic::new(
-                        Code::W408,
-                        format!("capability `{}` is listed twice", name.replace(':', " ")),
-                        c.span,
-                    )
-                    .with_note(at("first listed", *span));
+            match first.get(&name) {
+                Some(span) => {
+                    let message = format!(
+                        "capability `{}` is listed twice",
+                        written.as_deref().unwrap_or(&name)
+                    );
+                    let d = Diagnostic::new(Code::W408, message, c.span)
+                        .with_note(at("first listed", *span));
                     self.report(d);
                 }
-                None => first.push((name, c.span)),
+                None => {
+                    first.insert(name.clone(), c.span);
+                    names.push(name);
+                }
             }
         }
-        first.into_iter().map(|(name, _)| name).collect()
+        names
     }
 
     /// W401 when the mandate is no longer valid at `now` (from 00:00Z on its date).
@@ -850,7 +861,7 @@ impl<'a> Checker<'a> {
         &mut self,
         g: &ast::Goal,
         r: &ast::Rule,
-        subjects: &mut Vec<(SubjectKey, Span)>,
+        subjects: &mut HashMap<SubjectKey, Span>,
     ) -> ir::Rule {
         let (key, subject) = match &r.subject.kind {
             ast::SubjectKind::Close => (SubjectKey::Close, ir::Subject::Close),
@@ -867,14 +878,16 @@ impl<'a> Checker<'a> {
                 )
             }
         };
-        match subjects.iter().find(|(k, _)| *k == key) {
-            Some((_, first)) => {
+        match subjects.get(&key) {
+            Some(first) => {
                 let message = format!("goal `{}` already has a rule with this subject", g.id.name);
                 let d = Diagnostic::new(Code::E314, message, r.subject.span)
                     .with_note(at("first rule", *first));
                 self.report(d);
             }
-            None => subjects.push((key, r.subject.span)),
+            None => {
+                subjects.insert(key, r.subject.span);
+            }
         }
         let procedure = self.procedure(&r.procedure);
         let (within, otherwise) = self.timeout(r.timeout.as_ref(), "lets the request through");
@@ -949,7 +962,8 @@ impl<'a> Checker<'a> {
     /// E302 with a suggestion from the declared circles (and `members` for a vote).
     fn unknown_circle(&mut self, id: &ast::Ident, members_allowed: bool) {
         let members = members_allowed.then_some("members");
-        let suggestion = did_you_mean(&id.name, self.circles.order.iter().copied().chain(members));
+        let candidates = self.circles.order.iter().copied().chain(members);
+        let suggestion = self.suggester.did_you_mean(&id.name, candidates);
         let d = Diagnostic::new(Code::E302, format!("unknown circle `{}`", id.name), id.span);
         self.report(did_you_mean_note(d, suggestion));
     }

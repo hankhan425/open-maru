@@ -241,7 +241,7 @@ pub struct Principal {
 }
 
 /// The principal kinds a mandate can name.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum PrincipalKind {
     /// A declared agent.
