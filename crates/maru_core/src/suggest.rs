@@ -4,19 +4,47 @@
 pub const MAX_DISTANCE: usize = 2;
 
 /// Levenshtein distance between `a` and `b`, counted in Unicode scalar values.
-pub fn levenshtein(_a: &str, _b: &str) -> usize {
-    unimplemented!("L03")
+pub fn levenshtein(a: &str, b: &str) -> usize {
+    let b: Vec<char> = b.chars().collect();
+    let mut prev: Vec<usize> = (0..=b.len()).collect();
+    let mut cur = vec![0; b.len() + 1];
+    for (i, ca) in a.chars().enumerate() {
+        cur[0] = i + 1;
+        for (j, cb) in b.iter().enumerate() {
+            let substitute = prev[j] + usize::from(ca != *cb);
+            cur[j + 1] = substitute.min(prev[j + 1] + 1).min(cur[j] + 1);
+        }
+        std::mem::swap(&mut prev, &mut cur);
+    }
+    prev[b.len()]
+}
+
+/// The distance between `a` and `b` if it is at most [`MAX_DISTANCE`]. Names differing in
+/// length by more than that are skipped without computing anything.
+fn close(a: &str, b: &str) -> Option<usize> {
+    let (la, lb) = (a.chars().count(), b.chars().count());
+    if la.abs_diff(lb) > MAX_DISTANCE {
+        return None;
+    }
+    Some(levenshtein(a, b)).filter(|d| *d <= MAX_DISTANCE)
 }
 
 /// The candidate closest to `name` within [`MAX_DISTANCE`] edits; on a tie, the first in
 /// iteration order. `None` when nothing is that close.
 pub fn did_you_mean<'a>(
-    _name: &str,
-    _candidates: impl IntoIterator<Item = &'a str>,
+    name: &str,
+    candidates: impl IntoIterator<Item = &'a str>,
 ) -> Option<&'a str> {
-    unimplemented!("L03")
+    let mut best: Option<(usize, &'a str)> = None;
+    for candidate in candidates {
+        if let Some(d) = close(name, candidate) {
+            if best.is_none_or(|(b, _)| d < b) {
+                best = Some((d, candidate));
+            }
+        }
+    }
+    best.map(|(_, c)| c)
 }
-
 #[cfg(test)]
 mod tests {
     use super::*;
