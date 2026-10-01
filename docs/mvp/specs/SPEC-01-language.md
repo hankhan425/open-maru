@@ -142,7 +142,15 @@ Parsing is error-tolerant: on a syntax error inside a block, the parser skips to
 
 The checker is pure: `check(source, opts) → {diagnostics, ir?}`. IR is returned only when there are no errors. `opts.now` (optional ISO timestamp) enables time-relative warnings; without it they are skipped so checking stays deterministic.
 
-Checking has two stages. The parser reports E1xx, E2xx, E310 and E311. If it reports any error, `check` returns those diagnostics alone: no semantic checks run and there is no IR. The parser leaves an item with an error out of the tree, so checking that tree would report the same mistake again (a malformed `seats` would also be a missing one, E304). Semantic checks (the other E3xx codes and all W4xx) run only on a source that parses without errors.
+Checking has two stages. The parser reports E1xx, E2xx, E310 and E311. If it reports any error, `check` returns those diagnostics alone: no semantic checks run and there is no IR. The parser leaves an item with an error out of the tree, so checking that tree would report the same mistake again (a malformed `seats` would also be a missing one, E304). The first stage also formats the tree for the spec hash; when the formatted source would exceed 256 KiB, `check` returns that E109 alone. Semantic checks (the other E3xx codes and all W4xx) run only on a source that parses without errors.
+
+Within the semantic stage, one mistake gives one diagnostic:
+- A repeat is reported at its second occurrence, with a note giving the first one's position (e.g. `first declared at line 7, column 10`): E301, E305, E312, E313, E314, E323, W408. The repeat is then ignored (a second `fund` is not compared with spend limits; a repeated `can` adds nothing).
+- E305 covers every field that may appear once: `purpose`, `members` and `amend` in the org; `seats`, `term` and `holders`; `operator` and `runtime`; `steward`, `purpose`, `fund`, `on_underfunded`, `on_close` and `success` in a goal; `per_request`, `can` and `expires` in a mandate. Repeated `spend` lines are E313 (per category).
+- A value that is already an error is not checked again for its consequences: no E306 for a circle whose `seats` is missing or 0; no E307 above the seats of such a circle; no E316 where E307 or E302 applies; no W403 for a zero `fund` or spend limit; an unknown steward is E302, not also E317.
+- Circles, agents and goals have separate id spaces (a circle and a goal may both be `core`). A reference to a repeated id resolves to its first declaration.
+
+Spans: E301, E302, E303, E312, E315 and E317 point at the identifier or handle; E304 at the block's identifier (the org's name for `amend`); E305, E306, E313, W403, W404 and W405 at the whole item; E307 at the count; E308 at the threshold; E309 at the amount (`usd …`); E314 at the second rule's subject; E316 at the procedure; E318 at the goal's id; E319 at the duration; E322 at `members`; E324 at the number; W401 at the date; W402 at `within … else allow`; W406 at the agent's id; W408 at the repeated capability. Diagnostics are sorted by span start; ties keep the order in which they were found.
 
 | Code | Severity | Condition |
 |---|---|---|
@@ -179,19 +187,20 @@ Checking has two stages. The parser reports E1xx, E2xx, E310 and E311. If it rep
 | E319 | error | Duration must be > 0 |
 | E322 | error | `approve(members, …)` is not allowed |
 | E323 | error | Duplicate holder in a circle |
-| W401 | warning | Mandate `expires` is in the past (only with `opts.now`) |
+| E324 | error | `seats` or `invite(sponsors: …)` is 0 (OQ-10, interim) |
+| W401 | warning | Mandate `expires` is in the past: `opts.now` is at or after `DATE`T00:00:00Z (only with `opts.now`) |
 | W402 | warning | `else allow` on a rule or `amend` |
-| W403 | warning | A mandate's spend limit for a category exceeds the goal's `fund` normalized to the same period |
+| W403 | warning | A mandate's spend limit for a category exceeds the goal's `fund` normalized to the same period (both converted to a month with the §6.1 factors: `usd 50 / day` is 1,550 a month; a `once` fund never warns) |
 | W404 | warning | `on_underfunded` given but the goal has no `fund` |
-| W405 | warning | `per_request` exceeds every spend limit of the mandate (no effect) |
-| W406 | warning | Agent declared but holds no mandate in any goal |
+| W405 | warning | `per_request` exceeds every spend limit of the mandate, which has at least one (no effect) |
+| W406 | warning | Agent declared but holds no mandate in any goal (once, at its first declaration) |
 | W408 | warning | Duplicate capability |
 
 Diagnostic shape (all targets):
 ```json
 {"code":"E302","severity":"error","message":"unknown circle `cor`","span":{"start":{"line":14,"col":14,"offset":301},"end":{"line":14,"col":17,"offset":304}},"notes":["did you mean `core`?"]}
 ```
-Lines and columns are 1-based; columns count Unicode scalar values. "Did you mean" suggestions use Levenshtein distance ≤ 2.
+Lines and columns are 1-based; columns count Unicode scalar values. "Did you mean" suggestions use Levenshtein distance ≤ 2 (in Unicode scalar values) and name the closest declared id of the right kind, the first in source order on a tie: circles for E302 (plus `members` inside `vote(…)`), agents for E303, the org's other goals for E315. All lookups in one check share a work budget (`maru_core::suggest::Suggester::CHECK_BUDGET`, 4 million character comparisons); once it is spent, further unknown references get no suggestion. Only sources with thousands of unknown references and thousands of declared ids reach it, and the result stays deterministic.
 
 ## 6. IR (intermediate representation)
 
@@ -240,6 +249,18 @@ Stable JSON consumed by server, web, CLI. `ir_version: 1`. Arrays preserve sourc
 }
 ```
 Thresholds are stored as fractions: `60%` → `{"num":60,"den":100}` (not reduced); `2/4` stays `{"num":2,"den":4}`. Durations keep their source unit (`{"value":48,"unit":"h","secs":172800}`) so the charter can say "48 hours". `term` is `null` when absent. Defaults are materialized in the IR (never absent); the default timeout is `{"value":7,"unit":"d","secs":604800}`.
+
+The full shape is `crates/maru_core/schema/ir.v1.json` (JSON Schema 2020-12; every field required, no other fields). Beyond the excerpt:
+- Every field is always present. Optional values without a default are `null`: org and goal `purpose`, `term`, `fund`, `success`, `success.by`, `per_request_micros`, `expires`. Lists are `[]` when empty.
+- `membership`: `{"kind":"open"}` or `{"kind":"invite","sponsors":N}`.
+- `fund.period`: `"day"`, `"week"`, `"month"`, or `"once"` for `usd X once from treasury`.
+- `on_close`: `{"kind":"return_treasury"}` or `{"kind":"transfer","goal":"<goal id>"}`.
+- `success.value`: the metric target as a decimal string (`-` sign, no `_`, no leading zeros in the integer part, fraction digits as written; §4.8).
+- Procedures: `{"kind":"approve","circle":C,"count":N}`; `{"kind":"vote","circle":C | null,"threshold":T}`, where `null` means all members.
+- Rule subjects: `{"kind":"spend","category":"llm"|"compute"|"expense"|null,"over_micros":X|null}` or `{"kind":"close"}`.
+- `capabilities`: `claim_tasks`, `create_tasks`, `post_evidence`, `report_metric:<name>`, in source order without repeats (W408).
+- Handles (holders, operators, person principals) are written without `@`.
+- Threshold objects also carry `"percent": true|false`, whether the threshold was written as `p%` (OQ-11, interim; the excerpt above predates it).
 
 ### 6.1 Limits analysis
 For each goal, `unapproved_monthly_max_micros` is an upper bound on spend possible in one calendar month with no approvals:
