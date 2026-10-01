@@ -149,7 +149,7 @@ ARCHITECTURE > PRD.
 
 ### OQ-7: A deleted user's handle
 - **Task:** C01 (found while fixing handle rules; H02 implements deletion)
-- **Status:** open
+- **Status:** resolved
 - **Conflict:** SPEC-09 §4 removes PII on account deletion and renames the *display name* to
   `deleted-user-<n>`; "ledger, votes, and activity remain with the pseudonymous handle". H02-T08
   instead says the *handle* becomes `deleted-user-<n>`. C01 makes handles immutable once set.
@@ -162,10 +162,18 @@ ARCHITECTURE > PRD.
   handle still appears in every stored spec version's `source_text` and charter (immutable
   history), so renaming does not remove it; and an active spec naming `@old` would fail E501 on
   the next amendment. Under (a) a handle that is a real name stays public after deletion.
+- **Resolution:** (a). The handle is kept and stays taken, so nobody can sign up with it and
+  inherit the deleted user's specs, votes, mentions and links; it also stays in immutable spec
+  history either way. Deletion clears the display name (instead of renaming it
+  `deleted-user-<n>`) and sets a new `users.deleted_at`; the API and the web show the account as
+  deleted. A handle that is a real name stays public: if an erasure request ever requires
+  removing it, that is a separate path after the MVP. SPEC-09 §4, SPEC-02 §2 and H02-T08 are
+  updated. C01's `deleted-user-` prefix reservation stays, so no live handle reads as a deleted
+  account.
 
 ### OQ-8: The email field on the sign-in card
 - **Task:** C01 (affects F01)
-- **Status:** open
+- **Status:** resolved
 - **Conflict:** SPEC-08 §3 and F01 describe the sign-in card as "Email + passkey, GitHub,
   Google". C01 never takes an email: passkey registration is anonymous, passkey sign-in uses
   discoverable credentials (the passkey names the user), and an email is stored only when an
@@ -177,3 +185,7 @@ ARCHITECTURE > PRD.
   the MVP).
 - **Chosen (interim):** C01's API takes no email. F01 decides between (a) and (b); (a) keeps the
   prototype's layout.
+- **Resolution:** (b) for the MVP. The sign-in card offers a passkey, GitHub and Google; email
+  sign-up (c) can be added after the MVP as its own task. Without the field there is no passkey
+  autofill (conditional mediation); the passkey button opens the browser's passkey picker.
+  SPEC-08 §3 and F01 are updated.

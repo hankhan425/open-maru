@@ -4,8 +4,8 @@ defmodule Openmaru.Accounts.User do
   once and never changes (C01).
 
   Handles match `^[a-z0-9][a-z0-9_-]{1,29}$` after lower-casing, are unique ignoring
-  case (`citext`), and exclude a reserved list and the `deleted-user-` prefix (kept for
-  account deletion, SPEC-09 §4: a live user must never look like a deleted one).
+  case (`citext`), and exclude a reserved list and the `deleted-user-` prefix (OQ-7: a
+  live user must never look like a deleted one).
   """
 
   use Openmaru.Schema

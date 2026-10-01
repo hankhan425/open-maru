@@ -8,7 +8,7 @@ A principal is `{kind: person|agent|system, id}`. Stored as `(principal_kind, pr
 
 | Table | Key columns |
 |---|---|
-| `users` | `handle citext unique null` (picked after sign-up, lower-cased, `^[a-z0-9][a-z0-9_-]{1,29}$`, not reserved and not starting with `deleted-user-`, immutable once set), `display_name`, `email citext unique null` (provider-verified only), `platform_role` (`user`/`admin`), `suspended_at`, `webauthn_user_handle bytea unique null` (WebAuthn `user.id`, 32 random bytes) |
+| `users` | `handle citext unique null` (picked after sign-up, lower-cased, `^[a-z0-9][a-z0-9_-]{1,29}$`, not reserved and not starting with `deleted-user-`, immutable once set), `display_name`, `email citext unique null` (provider-verified only), `platform_role` (`user`/`admin`), `suspended_at`, `deleted_at` (account deletion, SPEC-09 §4; added by H02), `webauthn_user_handle bytea unique null` (WebAuthn `user.id`, 32 random bytes) |
 | `passkeys` | `user_id`, `credential_id bytea unique`, `cose_key bytea`, `sign_count`, `transports text[]`, `last_used_at` |
 | `oauth_identities` | `user_id`, `provider` (`github`/`google`), `provider_uid`, unique(`provider`,`provider_uid`) |
 | `user_sessions` | `user_id`, `token_hash unique`, `expires_at`, `revoked_at` |

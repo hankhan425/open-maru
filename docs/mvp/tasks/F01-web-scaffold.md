@@ -17,7 +17,7 @@ The React app shell every screen builds on: tokens and themes from the prototype
 - `src/lib/format`: money/duration/date/list/threshold formatters driven by `crates/maru_core/tests/vectors/human.json`.
 - `src/lib/realtime`: Phoenix socket wrapper + per-topic reducers into the query cache.
 - Components: `Button`, `Input`, `Card`, `Pill`, `Dialog`, `Toast`, `ProvenanceBadge`, `Money`, `Kbd`, `ShortcutsProvider`.
-- Screens: sign-in card (email + passkey, GitHub, Google; what the email field does is OQ-8), handle picker, `/device` approval.
+- Screens: sign-in card (passkey, GitHub, Google; no email field in the MVP, OQ-8), handle picker, `/device` approval.
 - Right after the handle picker, offer to add a second passkey or link GitHub/Google (skippable). C01 has no account recovery, so a user with a single passkey who loses the device loses the account.
 
 ## Tests to write first

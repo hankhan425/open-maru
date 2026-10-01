@@ -31,7 +31,7 @@ Provenance badges: **verified** `●` solid ink · **evidenced** `◐` half · *
 | Route | Screen | Key contents | Task |
 |---|---|---|---|
 | `/` | World | PixiJS canvas: orgs as drifting nodes sized by `sqrt(members)`, goals as satellites sized by monthly funding, shared-member edges, live pulses on spend/donation. Search, legend toggles, theme switch, list-view fallback. Sign-in card overlay (as in prototype). | F02 |
-| `/signin`, `/device` | Auth | Email + passkey, GitHub, Google; first-login handle picker; device-code approval | F01 |
+| `/signin`, `/device` | Auth | Passkey, GitHub, Google (no email in the MVP, OQ-8); first-login handle picker; device-code approval | F01 |
 | `/o/:slug` | Org | Name, purpose, **How it's governed** with `Charter / Source` toggle, circles (holders, vacancies, pending acceptances), goals with funding bars and status, membership action (join / request sponsorship), related (shared members) | F03 |
 | `/o/:slug/edit` | Spec editor | CodeMirror 6 with maru highlighting, live diagnostics from WASM (≤ 50 ms debounce), charter preview, diff vs active version with loosens/tightens markers and limits change, `Propose change` (title, rationale) | F04 |
 | `/o/:slug/proposals`, `/decisions/:id`, `/inbox` | Decisions | Proposal diff + charter delta; spend decision details; ballots, required count, countdown; approve/reject; holder acceptance items | F05 |
