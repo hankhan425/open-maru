@@ -144,6 +144,15 @@ jobs:
         if: hashFiles('apps/server/mix.exs') != ''
         run: just setup
       - run: just check-elixir
+      # G01-T22: ledger throughput (ARCHITECTURE §7 target: >= 1,000 linked pairs/s).
+      # Reported in the job summary, not enforced: runner speed varies.
+      - name: Ledger bench
+        if: hashFiles('apps/server/mix.exs') != ''
+        working-directory: apps/server
+        shell: bash
+        run: |
+          mix test --only bench | tee bench.log
+          { echo '### Ledger bench (G01-T22)'; grep LEDGER_BENCH bench.log; } >> "$GITHUB_STEP_SUMMARY"
 
   web:
     runs-on: ubuntu-latest

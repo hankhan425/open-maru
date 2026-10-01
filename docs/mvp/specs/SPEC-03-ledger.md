@@ -32,7 +32,7 @@ Trigger: rows cannot be deleted; only the four balance columns may be updated.
 | `pending_id` | uuid null | set on post/void |
 | `flags` | int | bit 0 `linked`, 1 `pending`, 2 `post_pending`, 3 `void_pending`, 4 `balancing_debit`, 5 `balancing_credit` |
 | `timeout_secs` | int | pending only; 0 = never |
-| `ledger`, `code` | int | code = purpose (§3) |
+| `ledger`, `code` | int | ledger is taken from the accounts (not an input); code = purpose (§3) |
 | `user_data_128` | uuid null | reference (spend record, donation, allocation) |
 | `user_data_64` | bigint null | period key (§5.2) |
 | `timestamp` | bigint | server-assigned µs since epoch, strictly increasing |
@@ -41,8 +41,11 @@ Trigger: rows cannot be deleted; only the four balance columns may be updated.
 
 Triggers reject UPDATE and DELETE. A partial unique index on `pending_id` (for rows with post/void flags) guarantees a pending transfer resolves at most once.
 
+### `ledger_pending_expiries`
+`pending_id` (PK), `expires_at` (bigint µs = pending `timestamp` + `timeout_secs` × 10⁶). Derived index for the expiry sweeper (§4.3): a row is written with each pending transfer that has a timeout and deleted when that transfer resolves, so the sweeper never scans resolved history. Not part of the hash chain; rebuildable from `ledger_transfers`.
+
 ### `ledger_checkpoints`
-`date` (unique), `first_seq`, `last_seq`, `count`, `head_hash`, `prev_checkpoint_hash`, `checkpoint_hash`, `anchor` jsonb null (G05).
+`date` (unique), `first_seq`, `last_seq`, `count`, `head_hash`, `prev_checkpoint_hash`, `checkpoint_hash`, `anchor` jsonb null (G05). A trigger rejects UPDATE, DELETE and TRUNCATE, except setting `anchor` once while it is null.
 
 ### `goal_allocations`
 `goal_id`, `period_key`, `requested_micros`, `allocated_micros`, `shortfall_micros`; unique(`goal_id`,`period_key`).
@@ -64,7 +67,9 @@ Triggers reject UPDATE and DELETE. A partial unique index on `pending_id` (for r
 | 600 | `system:allowance_source` | none | Source of allowance grants |
 | 610 | `system:allowance_sink` | none | Sink of consumed/reset allowance |
 
-Accounts are created with their owner: org creation creates 100, 110, 200, 210×2; goal adoption creates 300 and 400×5; mandate creation creates one 500 per spend category (new categories later create new accounts). System accounts are created by a migration.
+Accounts are created with their owner: org creation creates 100, 110, 200, 210×2; goal adoption creates 300 and 400×5; mandate creation creates one 500 per spend category (new categories later create new accounts). System accounts are created by a migration, with id = `uuidv5(key)` (`13a8b848-795e-5365-8aab-dcb51235c51d` for 600, `3dd63a3b-7c4c-520f-ae03-92e4f528ac2a` for 610).
+
+`create_accounts/1` returns one result per account, like `create_transfers/1`: `{:ok, :created}`, `{:ok, :exists}` (same id, identical `key`, `ledger`, `code`, `flags`), or `{:error, code}` checked in this order: `id_must_not_be_zero` · `exists_with_different_fields` · `flags_are_mutually_exclusive` (both balance flags) · `ledger_must_not_be_zero` · `code_must_not_be_zero` · `key_must_not_be_empty` · `key_exists` (another id holds the key).
 
 | Transfer code | Meaning |
 |---|---|
@@ -78,30 +83,32 @@ Accounts are created with their owner: org creation creates 100, 110, 200, 210×
 Input: list of transfer maps. Output: list of `{:ok, :created | :exists}` or `{:error, code}` in input order. One DB transaction per call.
 
 ### 4.1 Ordering and locking
-All ledger writes take `pg_advisory_xact_lock(<ledger constant>)`. This serializes writes, gives a total order for `seq`/`timestamp`/hash chain, and removes deadlock risk. Target ≥ 1,000 linked pairs/s (ARCHITECTURE §7).
+All ledger writes (`create_accounts` included) take `pg_advisory_xact_lock(<ledger constant>)` (`0x6F6D4C4544474552`, "omLEDGER") as their first statement, under READ COMMITTED. This serializes writes, gives a total order for `seq`/`timestamp`/hash chain, and removes deadlock risk. A row's `timestamp` is `max(Clock µs, previous timestamp + 1)`; failed transfers consume no `seq` or timestamp. Target ≥ 1,000 linked pairs/s (ARCHITECTURE §7).
 
 ### 4.2 Validation (checked in this order; first failure wins)
-`exists` (same id and identical fields → `{:ok, :exists}`, no effect) · `exists_with_different_fields` · `accounts_must_be_different` · `debit_account_not_found` · `credit_account_not_found` · `accounts_must_have_the_same_ledger` · `amount_must_not_be_zero` (except post: see below) · `timeout_reserved_for_pending_transfer` · pending-specific checks · `overflows` · `exceeds_credits` (debit account DMNEC: `debits_pending + debits_posted + amount > credits_posted`) · `exceeds_debits` (credit account CMNED, symmetric).
+`id_must_not_be_zero` (null or all-zero id) · `exists` (same id and identical fields → `{:ok, :exists}`, no effect) · `exists_with_different_fields` · shape checks: `flags_are_mutually_exclusive` (post with void; post or void with pending or balancing), `pending_id_must_not_be_zero` and `pending_id_must_be_different` (post/void), `pending_id_must_be_zero` (others), `code_must_not_be_zero` · `accounts_must_be_different` · `debit_account_not_found` · `credit_account_not_found` · `accounts_must_have_the_same_ledger` · `amount_must_not_be_zero` (except post: see below) · `timeout_reserved_for_pending_transfer` · pending-specific checks (post/void: `pending_transfer_not_found` · `pending_transfer_not_pending` · `pending_transfer_has_different_debit_account_id` · `pending_transfer_has_different_credit_account_id` · `pending_transfer_has_different_code` · `exceeds_pending_transfer_amount` (post) · `pending_transfer_has_different_amount` (void) · `pending_transfer_already_posted` · `pending_transfer_already_voided` · `pending_transfer_expired`) · `overflows` (a balance, or pending + posted on one side, above 2^63 − 1) · `exceeds_credits` (debit account DMNEC: `debits_pending + debits_posted + amount > credits_posted`) · `exceeds_debits` (credit account CMNED, symmetric).
+
+For `exists`, omitted post/void fields compare as their values taken from the pending transfer, and a balancing transfer compares its request with `requested_amount`. Malformed input (a non-UUID id, an unknown flag, a negative or out-of-range integer, an unknown field) is a programming error and raises instead of returning a code.
 
 ### 4.3 Two-phase
 - **Pending** (`pending` flag): increments `debits_pending`/`credits_pending`. `timeout_secs > 0` sets an expiry.
-- **Post** (`post_pending`, `pending_id`): `amount` null or omitted ⇒ full pending amount; otherwise must be ≤ pending amount (`exceeds_pending_transfer_amount`). Moves the pending amount out of pending balances and adds the posted amount to posted balances. Debit/credit accounts may be omitted (taken from the pending transfer); if given they must match.
+- **Post** (`post_pending`, `pending_id`): `amount` null or omitted ⇒ full pending amount; otherwise must be ≤ pending amount (`exceeds_pending_transfer_amount`). Moves the pending amount out of pending balances and adds the posted amount to posted balances. Debit/credit accounts and `code` may be omitted (taken from the pending transfer); if given they must match (`pending_transfer_has_different_debit_account_id`, `…_credit_account_id`, `…_code`). Omitted `user_data_128`/`user_data_64` are also taken from the pending transfer; given ones replace them. An `amount` of 0 is allowed and releases the hold without posting.
 - **Void** (`void_pending`, `pending_id`): releases the full pending amount; `amount` must be null or equal (`pending_transfer_has_different_amount`).
 - Errors: `pending_transfer_not_found`, `pending_transfer_not_pending` (not a pending transfer), `pending_transfer_already_posted`, `pending_transfer_already_voided`, `pending_transfer_expired`.
-- Expiry: a sweeper (Oban, every 30 s) voids expired pending transfers with deterministic IDs `uuidv5("expire:<pending_id>")` and `user_data_64 = -1`. Expired transfers can't be posted.
+- Expiry: a pending transfer expires once `timestamp + timeout_secs × 10⁶ ≤` the resolving transfer's timestamp. From then on posts and voids get `pending_transfer_expired` (also after the sweep), and only the sweeper resolves it: Oban, every 30 s (a minute cron plus a follow-up 30 s later), voids expired pending transfers with deterministic IDs `uuidv5("expire:<pending_id>")` and `user_data_64 = -1`; a rerun is a no-op.
 
 ### 4.4 Linked chains
-A transfer with `linked` is atomic with the next one; a chain ends at the first transfer without `linked`. If any transfer in a chain fails, none apply: the failing transfer gets its code, the others get `linked_event_failed`. A batch ending with an open chain → every transfer of that chain gets `linked_event_chain_open`.
+A transfer with `linked` is atomic with the next one; a chain ends at the first transfer without `linked`. If any transfer in a chain fails, none apply: the failing transfer gets its code, the others get `linked_event_failed`. A batch ending with an open chain → every transfer of that chain gets `linked_event_chain_open`, without being evaluated. An `exists` member counts as success (a replayed chain returns `exists` for every member). Members after a failing one are not evaluated.
 
 ### 4.5 Balancing transfers
 `balancing_debit`: actual amount = `min(requested, debit available)` where available = `credits_posted − debits_posted − debits_pending`. `balancing_credit` symmetric. Actual may be 0 (allowed only for balancing). Stored in `amount`; request in `requested_amount`.
 
 ### 4.6 Lookups
-`lookup_accounts(ids)`, `lookup_transfers(ids)`, `account_transfers(account_id, filter)` (by code, period key, time range; cursor), `balance(account_id)` → `%{debits_pending, debits_posted, credits_pending, credits_posted, available}`.
+`lookup_accounts(ids)`, `lookup_transfers(ids)` (input order; unknown ids skipped), `account_transfers(account_id, filter)` (either side, by `seq`; filters `code` (one or list), `period_key`, `from` inclusive / `to` exclusive, `order`, `limit` 1–1000 (default 100), opaque `cursor`; returns `{:ok, %{data, next_cursor}}`), `balance(account_id)` → `%{debits_pending, debits_posted, credits_pending, credits_posted, available}` (available as in §4.5 on the debit side; for CMNED accounts `debits_posted − credits_posted − credits_pending`). `verify_chain(from_seq, to_seq)` → `:ok | {:error, {:hash_mismatch | :seq_gap, seq}}`; `verify_balances()` → `:ok | {:error, [{account_id, expected, actual}]}`.
 
 ## 5. Flows (exact transfer patterns)
 
-`uuidv5(x)` means UUIDv5 in the openmaru namespace; deterministic IDs make scheduled and webhook-driven transfers idempotent.
+`uuidv5(x)` means UUIDv5 in the openmaru namespace `7075e138-6378-557c-ad88-8dd8ed95be90` (= UUIDv5 of `https://openmaru.org/` in the RFC 9562 URL namespace); deterministic IDs make scheduled and webhook-driven transfers idempotent. `apps/server/test/fixtures/ledger_vectors.json` lists reference values.
 
 ### 5.1 Spend (hold → post/void)
 Hold (linked pair, both `pending`, timeout 900 s for gateway, 120 s for runtime ticks, 0 for decisions):

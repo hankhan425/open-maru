@@ -28,7 +28,12 @@ config :openmaru, Oban,
   queues: [default: 10, ledger: 5, webhooks: 10, gateway: 10, runtime: 5, scheduled: 5],
   plugins: [
     {Oban.Plugins.Pruner, max_age: 7 * 24 * 3600},
-    {Oban.Plugins.Cron, crontab: [{"17 * * * *", Openmaru.Accounts.PruneWorker}]}
+    {Oban.Plugins.Cron,
+     crontab: [
+       {"17 * * * *", Openmaru.Accounts.PruneWorker},
+       # Pending-transfer expiry; each run schedules a second one 30 s later (G01).
+       {"* * * * *", Openmaru.Ledger.ExpiryWorker}
+     ]}
   ]
 
 # C01 accounts. Dev/test values; config/runtime.exs sets production ones.
