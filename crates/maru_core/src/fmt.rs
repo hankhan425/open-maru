@@ -13,8 +13,9 @@
 //!
 //! Numbers: counts and money have their integer part grouped by thousands with `_` when it
 //! has 4 or more digits; money fractions lose trailing zeros but keep at least 2 digits.
-//! Metric values keep their digits as written apart from that grouping, because the AST
-//! keeps them as text. Durations and dates are never grouped.
+//! Metric values are grouped the same way and keep their fraction digits as written (the AST
+//! keeps them as text; the parser drops leading zeros of the integer part). Durations and
+//! dates are never grouped.
 
 use sha2::{Digest, Sha256};
 
@@ -479,7 +480,7 @@ fn money(m: &Money) -> String {
     format!("usd {whole}.{digits}")
 }
 
-/// A metric value: sign and digits as written, the integer part grouped.
+/// A metric value: the sign, the integer part grouped, the fraction digits as written.
 fn signed(s: &Signed) -> String {
     let mut out = String::new();
     if s.negative {

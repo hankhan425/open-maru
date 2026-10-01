@@ -512,7 +512,8 @@ impl<'a> Parser<'a> {
         })
     }
 
-    /// `["-"] (INT | DECIMAL)` for metric targets.
+    /// `["-"] (INT | DECIMAL)` for metric targets. Leading zeros of the integer part are
+    /// dropped (keeping one digit), so `010` and `10` are the same value (OQ-9).
     fn signed(&mut self) -> PResult<Signed> {
         let start = self.span();
         let negative = self.eat(&TokenKind::Minus).is_some();
@@ -524,6 +525,10 @@ impl<'a> Parser<'a> {
             _ => return Err(self.expected("a number")),
         };
         self.bump();
+        let int = match int.trim_start_matches('0') {
+            "" => "0".to_string(),
+            digits => digits.to_string(),
+        };
         Ok(Signed {
             negative,
             int,
