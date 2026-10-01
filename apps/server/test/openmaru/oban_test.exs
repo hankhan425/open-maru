@@ -2,6 +2,8 @@ defmodule Openmaru.ObanTest do
   use Openmaru.DataCase, async: true
   use Oban.Testing, repo: Openmaru.Repo
 
+  alias Oban.Cron.Expression
+
   defmodule ProbeWorker do
     @moduledoc false
     use Oban.Worker, queue: :default
@@ -20,7 +22,12 @@ defmodule Openmaru.ObanTest do
              Enum.sort([:default, :ledger, :webhooks, :gateway, :runtime, :scheduled])
 
     assert {Oban.Plugins.Cron, cron} = List.keyfind(config[:plugins], Oban.Plugins.Cron, 0)
-    assert cron[:crontab] == []
+
+    # Later tasks add schedules (C01: auth cleanup); every entry must name an Oban worker.
+    for {expression, worker} <- cron[:crontab] do
+      assert {:ok, _} = Expression.parse(expression)
+      assert Code.ensure_loaded?(worker) and function_exported?(worker, :perform, 1)
+    end
   end
 
   test "T02-T13 jobs are enqueued but not executed automatically in tests" do

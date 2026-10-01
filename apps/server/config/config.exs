@@ -28,8 +28,30 @@ config :openmaru, Oban,
   queues: [default: 10, ledger: 5, webhooks: 10, gateway: 10, runtime: 5, scheduled: 5],
   plugins: [
     {Oban.Plugins.Pruner, max_age: 7 * 24 * 3600},
-    {Oban.Plugins.Cron, crontab: []}
+    {Oban.Plugins.Cron, crontab: [{"17 * * * *", Openmaru.Accounts.PruneWorker}]}
   ]
+
+# C01 accounts. Dev/test values; config/runtime.exs sets production ones.
+# WebAuthn relying party: the web app's origin (Vite dev server).
+config :openmaru, Openmaru.Accounts.WebAuthn,
+  rp_id: "localhost",
+  rp_name: "openmaru",
+  origin: "http://localhost:5173"
+
+# OAuth providers are enabled by a client_id (config/runtime.exs reads them from env).
+config :openmaru, Openmaru.Accounts.OAuth, providers: [github: [], google: []]
+
+# Key for the audit log's IP hash (Openmaru.Audit); AUDIT_IP_HASH_KEY in prod.
+config :openmaru, Openmaru.Audit, ip_hash_key: "dev-only audit ip hash key"
+
+# SPEC-09 §6 rate limits per bucket; config/runtime.exs can override them per environment.
+config :openmaru, OpenmaruWeb.Plugs.RateLimit, limits: [auth: [limit: 10, scale_ms: 60_000]]
+
+# Proxies whose x-forwarded-for is believed (CIDRs). Empty: the TCP peer is the client.
+config :openmaru, OpenmaruWeb.Plugs.ClientIP, trusted_proxies: []
+
+# Where OAuth callbacks send the browser.
+config :openmaru, :web_url, "http://localhost:5173"
 
 # Configure the endpoint
 config :openmaru, OpenmaruWeb.Endpoint,
@@ -48,6 +70,10 @@ config :logger, :default_formatter,
 
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
+
+# SPEC-09 §3: redact credentials from Phoenix's request parameter logs (keys containing
+# these strings), e.g. OAuth `code` and WebAuthn `credential` (C01).
+config :phoenix, :filter_parameters, ~w(password token secret key code credential)
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

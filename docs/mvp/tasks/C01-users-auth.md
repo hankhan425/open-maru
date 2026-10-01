@@ -16,7 +16,7 @@ People can sign up and sign in with passkeys, GitHub, or Google, pick an immutab
 - WebAuthn via `wax_` (rp id from config; user verification required; challenges stored server-side, 5-minute TTL, single use).
 - OAuth via `assent` (GitHub, Google), state/nonce protection; linking rule per SPEC-09 §1.
 - Session plug (cookie `_om_session`, `HttpOnly; Secure; SameSite=Lax`, 30-day sliding), CSRF plug (`x-csrf-token` required on mutating cookie-authenticated requests; token from `GET /api/v1/auth/csrf`).
-- Handle rules: `^[a-z0-9][a-z0-9_-]{1,29}$`, case-insensitive unique, reserved list (`admin api app auth help mcp openmaru root settings support system www gw`), **immutable once set**.
+- Handle rules: `^[a-z0-9][a-z0-9_-]{1,29}$`, case-insensitive unique, reserved list (`admin api app auth help mcp openmaru root settings support system www gw`) and reserved prefix `deleted-user-` (OQ-7), **immutable once set**.
 - Hammer limit 10/min/IP on auth endpoints. Audit entries for sign-in success/failure.
 - A test helper `Openmaru.Test.FakeAuthenticator` producing valid WebAuthn attestations/assertions for tests.
 
@@ -31,7 +31,7 @@ People can sign up and sign in with passkeys, GitHub, or Google, pick an immutab
 - [ ] **C01-T08** OAuth, not signed in, provider email equals an existing user's email → no linking, 409 `account_exists` (redirect with that error for browser flow).
 - [ ] **C01-T09** OAuth while signed in with a provider-verified email → identity linked to the current user.
 - [ ] **C01-T10** `PATCH /me {handle}`: valid handle set; invalid pattern → 422; reserved → 422; taken (case-insensitive) → 409 `handle_taken`.
-- [ ] **C01-T11** Changing an already-set handle → 422 `invalid_request` (`handle_immutable` in details).
+- [ ] **C01-T11** Changing an already-set handle → 422 `validation_failed` (`handle_immutable` in details; OQ-5).
 - [ ] **C01-T12** `GET /me` without session → 401 `unauthenticated`; with session → user JSON (no email for other users; own email included).
 - [ ] **C01-T13** Logout revokes the session; reusing the cookie → 401.
 - [ ] **C01-T14** Sliding expiry (Clock): activity on day 29 extends; 31 idle days → 401.

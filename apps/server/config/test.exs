@@ -23,6 +23,13 @@ config :openmaru, OpenmaruWeb.Endpoint,
   secret_key_base: "YV2rAgbUQ7fehb6tgpSJctFplrydHXOhT8BdHVaQwog+Z5MC9Uk2JqlfoByr2Gtu",
   server: false
 
+# OAuth providers with fake credentials; tests point their URLs at Bypass.
+config :openmaru, Openmaru.Accounts.OAuth,
+  providers: [
+    github: [client_id: "test-github-client", client_secret: "test-github-secret"],
+    google: [client_id: "test-google-client", client_secret: "test-google-secret"]
+  ]
+
 # Mox mocks (defined in test/support/mocks.ex) replace these implementations.
 config :openmaru, clock: Openmaru.ClockMock, health: Openmaru.HealthMock
 

@@ -16,6 +16,7 @@ CLI and scripts authenticate with PATs obtained through a device flow; one plug 
 - Device flow endpoints (`/auth/device/code`, `/auth/device/token`, `/auth/device/approve`) with RFC 8628-style error codes in our envelope: `authorization_pending`, `slow_down`, `expired_token`, `access_denied`, `invalid_grant`.
 - `OpenmaruWeb.Plugs.ApiAuth`: precedence Bearer header > session cookie. `om_pat_…` → person; `om_mt_…` → `Openmaru.Mandates.TokenVerifier` behaviour (default impl returns `{:error, :not_implemented}` until M01; Mox in tests). Assigns `current_actor`:
   - `{:person, %User{}}`, `{:agent, %Agent{}, claims}`, `{:person_mandate, %User{}, claims}`.
+- CSRF (`OpenmaruWeb.Plugs.CSRF`, C01) applies only when the request is authenticated by the session cookie. Today it checks whenever a session cookie resolved; once a Bearer credential wins (C02-T09), a mutation carrying both must not need `x-csrf-token`. Fold `OpenmaruWeb.Plugs.Session` into the cookie branch of `ApiAuth` (or key the CSRF check on how the actor was authenticated).
 - Route pipeline flag `:mandate_ok` marking routes where mandate tokens are allowed (SPEC-07 **M**); mandate token elsewhere → 403 `forbidden`.
 - `GET /api/v1/socket-token` → 5-minute signed token for Channels (`Phoenix.Token`), plus `verify_socket_token/1`.
 

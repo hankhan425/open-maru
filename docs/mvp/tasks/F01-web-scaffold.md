@@ -17,7 +17,8 @@ The React app shell every screen builds on: tokens and themes from the prototype
 - `src/lib/format`: money/duration/date/list/threshold formatters driven by `crates/maru_core/tests/vectors/human.json`.
 - `src/lib/realtime`: Phoenix socket wrapper + per-topic reducers into the query cache.
 - Components: `Button`, `Input`, `Card`, `Pill`, `Dialog`, `Toast`, `ProvenanceBadge`, `Money`, `Kbd`, `ShortcutsProvider`.
-- Screens: sign-in card (email + passkey, GitHub, Google), handle picker, `/device` approval.
+- Screens: sign-in card (passkey, GitHub, Google; no email field in the MVP, OQ-8), handle picker, `/device` approval.
+- Right after the handle picker, offer to add a second passkey or link GitHub/Google (skippable). C01 has no account recovery, so a user with a single passkey who loses the device loses the account.
 
 ## Tests to write first
 - [ ] **F01-T01** Shell renders with graphite tokens; theme switch applies `data-theme` and persists across reloads.
@@ -33,6 +34,7 @@ The React app shell every screen builds on: tokens and themes from the prototype
 - [ ] **F01-T11** `ProvenanceBadge` renders ●/◐/○ with label and tooltip; accessible name includes the tier.
 - [ ] **F01-T12** Realtime reducer: a `ledger` event prepends into the goal-ledger query cache without refetch; unknown events ignored.
 - [ ] **F01-T13** Axe: no violations on the shell and sign-in card, both themes, light and dark.
+- [ ] **F01-T14** After a first handle is picked, the user is offered "add another passkey" (registration options with the session) and "link GitHub/Google"; skipping goes to returnTo.
 
 ## Out of scope
 Feature screens (F02–F08).

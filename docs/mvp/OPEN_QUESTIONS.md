@@ -94,3 +94,98 @@ ARCHITECTURE > PRD.
   a problem. The derived monthly limit is summed exactly; over the money maximum the checker
   reports the new E318 on the goal (SPEC-01 §5, §6.1; L03-T32), rather than saturating, which
   would understate the bound the charter states.
+
+### OQ-5: Status of the "handle already set" error
+- **Task:** C01
+- **Status:** resolved
+- **Conflict:** C01-T11 expects "422 `invalid_request` (`handle_immutable` in details)". SPEC-07 §2
+  maps `invalid_request` to 400 and gives 422 to `validation_failed`, and `Openmaru.Error.status/1`
+  derives the HTTP status from the code everywhere.
+- **Options:** (a) keep the code, answer 400 `invalid_request` with
+  `details.reason: "handle_immutable"`; (b) keep the status, answer 422 `validation_failed` with
+  the reason in `details`; (c) answer 422 with `invalid_request`, breaking the code-to-status
+  table.
+- **Chosen (interim):** (a). Clients switch on codes (CONVENTIONS §4), so the test keeps the code
+  and the `handle_immutable` detail and asserts 400. An invalid or reserved handle stays 422
+  `validation_failed` (C01-T10).
+- **Resolution:** (b). Neither `invalid_request` nor `validation_failed` is specific to this
+  case, so in either option clients switch on `details.reason`; the choice is which class the
+  error belongs to. It is a well-formed request refused by a rule, like the other handle errors
+  of the same `PATCH /me` (C01-T10, 422) and like C04's no-op proposal ("422 with
+  `details.reason = "no_changes"`"). The answer is 422 `validation_failed` with
+  `details.reason: "handle_immutable"` and `details.fields.handle`, so the handle picker
+  (F01-T07) shows it inline like any other handle error. A new 409 code was rejected: it would
+  add a stable code for an error the UI cannot produce (the picker shows only while the handle
+  is unset). SPEC-07 §2 now states which class to use (400 malformed, 422 refused by a rule,
+  409 conflict with another resource), and C01-T11 is updated.
+
+### OQ-6: When the audit log hashes client IPs
+- **Task:** C01
+- **Status:** resolved
+- **Conflict:** SPEC-09 §7 records the "IP (hashed after 30 days)", which means keeping the raw
+  address for 30 days and rewriting the row later. C01 makes `audit_log` append-only with a
+  trigger that rejects `UPDATE` (C01-T18), and C01-T18 expects sign-in rows "written with hashed
+  IP".
+- **Options:** (a) hash at write time; (b) keep raw IPs in a separate, mutable table that a job
+  deletes after 30 days, referenced from the audit row; (c) let the trigger allow one `UPDATE`
+  that only replaces the IP with its hash.
+- **Chosen (interim):** (a). `audit_log.ip_hash` holds HMAC-SHA-256 of the address under a server
+  key (`Openmaru.Audit.hash_ip/1`; derived from `SECRET_KEY_BASE` in production), so equal
+  addresses still correlate and the IPv4 space cannot be brute-forced without the key. No raw IP
+  is stored, which is stricter than SPEC-09 §7; abuse handling within 30 days works on the
+  hashes.
+- **Resolution:** (a), with a dedicated key. Raw IPs cannot sit in an append-only table and
+  still be removed with the rest of a deleted account's PII (SPEC-09 §4), and raw addresses
+  for incident response belong in load-balancer logs with their own retention. Hashing at
+  write time is stricter than §7 only for the first 30 days: IPv4 has 2^32 addresses, so the
+  key holder can reverse any hash by trying them all, for as long as the key exists. The key
+  is therefore its own secret (`AUDIT_IP_HASH_KEY`, required in production, at least 32
+  bytes) rather than derived from `SECRET_KEY_BASE`, so rotating that secret leaves hashes
+  comparable; each row records `ip_hash_key_id` (a fingerprint of the key), so hashes from
+  different keys are told apart after a rotation. Rotating the key and destroying old ones
+  would make old hashes unlinkable, if the 30-day intent needs that later. SPEC-09 §7 and
+  SPEC-02 §2 are updated. The address hashed is the client's as resolved by trusted-proxy
+  handling (SPEC-09 §6), not the load balancer's.
+
+### OQ-7: A deleted user's handle
+- **Task:** C01 (found while fixing handle rules; H02 implements deletion)
+- **Status:** resolved
+- **Conflict:** SPEC-09 §4 removes PII on account deletion and renames the *display name* to
+  `deleted-user-<n>`; "ledger, votes, and activity remain with the pseudonymous handle". H02-T08
+  instead says the *handle* becomes `deleted-user-<n>`. C01 makes handles immutable once set.
+- **Options:** (a) keep the handle, rename the display name (SPEC-09 §4); (b) rename the handle
+  (H02-T08), the one exception to immutability.
+- **Chosen (interim):** none needed yet (C01 has no deletion). C01 reserves the
+  `deleted-user-` prefix either way, so no live user can take a name that looks like a deleted
+  account, and (b) can never collide with a taken handle.
+- **Notes for the decision:** SPEC outranks the task file, which points to (a). Under (b) the old
+  handle still appears in every stored spec version's `source_text` and charter (immutable
+  history), so renaming does not remove it; and an active spec naming `@old` would fail E501 on
+  the next amendment. Under (a) a handle that is a real name stays public after deletion.
+- **Resolution:** (a). The handle is kept and stays taken, so nobody can sign up with it and
+  inherit the deleted user's specs, votes, mentions and links; it also stays in immutable spec
+  history either way. Deletion clears the display name (instead of renaming it
+  `deleted-user-<n>`) and sets a new `users.deleted_at`; the API and the web show the account as
+  deleted. A handle that is a real name stays public: if an erasure request ever requires
+  removing it, that is a separate path after the MVP. SPEC-09 §4, SPEC-02 §2 and H02-T08 are
+  updated. C01's `deleted-user-` prefix reservation stays, so no live handle reads as a deleted
+  account.
+
+### OQ-8: The email field on the sign-in card
+- **Task:** C01 (affects F01)
+- **Status:** resolved
+- **Conflict:** SPEC-08 §3 and F01 describe the sign-in card as "Email + passkey, GitHub,
+  Google". C01 never takes an email: passkey registration is anonymous, passkey sign-in uses
+  discoverable credentials (the passkey names the user), and an email is stored only when an
+  OAuth provider has verified it (SPEC-09 §1). There is no mailer or email verification in the
+  MVP.
+- **Options:** (a) keep the field only as the WebAuthn autofill hook
+  (`autocomplete="username webauthn"`, conditional mediation), sending nothing to the server;
+  (b) drop the field; (c) add email sign-up with verification (a mailer, a new flow; outside
+  the MVP).
+- **Chosen (interim):** C01's API takes no email. F01 decides between (a) and (b); (a) keeps the
+  prototype's layout.
+- **Resolution:** (b) for the MVP. The sign-in card offers a passkey, GitHub and Google; email
+  sign-up (c) can be added after the MVP as its own task. Without the field there is no passkey
+  autofill (conditional mediation); the passkey button opens the browser's passkey picker.
+  SPEC-08 §3 and F01 are updated.

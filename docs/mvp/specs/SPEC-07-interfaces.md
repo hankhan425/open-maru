@@ -10,6 +10,7 @@ Auth column: **S** session cookie, **P** personal access token, **M** mandate to
 | `POST /auth/passkey/register/options`, `POST /auth/passkey/register` | — / S | C01 |
 | `POST /auth/passkey/login/options`, `POST /auth/passkey/login` | — | C01 |
 | `GET /auth/oauth/:provider`, `GET /auth/oauth/:provider/callback` | — | C01 |
+| `GET /auth/csrf` → `{csrf_token}` (send as `x-csrf-token` on cookie-authenticated mutations) | S | C01 |
 | `POST /auth/logout` | S | C01 |
 | `GET /me`, `PATCH /me` (handle, display name) | S P | C01 |
 | `POST /auth/device/code`, `POST /auth/device/token` | — | C02 |
@@ -77,6 +78,8 @@ Auth column: **S** session cookie, **P** personal access token, **M** mandate to
 ## 2. Error codes (stable)
 
 Envelope: `{"error":{"code","message","details"}}`. Validation errors carry `details.diagnostics` (SPEC-01 §5 shape).
+
+Choosing between the generic codes: `invalid_request` (400) is a malformed request or a failed protocol step (unparseable body, unknown or expired challenge or OAuth state); `validation_failed` (422) is a well-formed request refused by a rule, with `details.fields` for field errors and `details.reason` for a machine-readable subtype (e.g. `handle_immutable`, `no_changes`); a 409 code is a conflict with another resource or a concurrent change (`handle_taken`, `stale_proposal`).
 
 | Code | HTTP | Code | HTTP |
 |---|---|---|---|

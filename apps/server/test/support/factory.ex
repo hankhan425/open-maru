@@ -28,6 +28,20 @@ defmodule Openmaru.Factory do
     )
   end
 
+  def build(:user, attrs) do
+    n = System.unique_integer([:positive])
+
+    struct!(
+      Openmaru.Accounts.User,
+      Enum.into(attrs, %{
+        handle: "user#{n}",
+        display_name: "User #{n}",
+        email: "user#{n}@example.com",
+        platform_role: "user"
+      })
+    )
+  end
+
   @doc "Builds and inserts a struct for `name`."
   @spec insert!(atom(), Enumerable.t()) :: struct()
   def insert!(name, attrs \\ %{}), do: name |> build(attrs) |> Repo.insert!()
