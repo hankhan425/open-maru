@@ -1050,3 +1050,26 @@ fn l03_suggestions_have_a_work_budget() {
     assert_eq!(unknown.len(), 401);
     assert!(unknown.iter().all(|d| d.notes.is_empty()));
 }
+
+// L03 extra: W403 needs a limit strictly above the fund; equal amounts are fine, also
+// across periods (`usd 10 / week` is 60 a month).
+#[test]
+fn l03_spend_limit_equal_to_the_fund_does_not_warn() {
+    let with = |fund: &str, spend: &str| {
+        in_goal(&format!(
+            "    fund: {fund} from treasury\n\n    mandate @jo {{\n      spend expense <= {spend}\n    }}"
+        ))
+    };
+    // `builder`'s `spend llm <= usd 100 / month` equals the fund too.
+    ir_ok(&with("usd 100 / month", "usd 100 / month"));
+    let with_60 = |fund: &str, spend: &str| {
+        with(fund, spend).replace(
+            "spend llm <= usd 100 / month",
+            "spend llm <= usd 60 / month",
+        )
+    };
+    ir_ok(&with_60("usd 60 / month", "usd 10 / week"));
+    let src = with_60("usd 60 / month", "usd 10.000001 / week");
+    let d = only(&src, Code::W403);
+    assert_eq!(text(&src, &d), "spend expense <= usd 10.000001 / week");
+}
