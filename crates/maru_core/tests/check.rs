@@ -144,7 +144,7 @@ fn l03_t03_duplicate_ids_are_e301_on_the_second() {
         let second = src.rfind(decl).unwrap() + decl.len() - id.len();
         assert_eq!(d.span.start.offset, second, "span on the second {decl}");
         let first = src.find(decl).unwrap();
-        let (line, col) = line_col(src, id, first);
+        let (line, col) = line_col(src, id, first + decl.len() - id.len());
         let expected = format!("line {line}, column {col}");
         assert!(
             d.notes.iter().any(|n| n.contains(&expected)),

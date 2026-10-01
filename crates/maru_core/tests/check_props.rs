@@ -50,7 +50,7 @@ fn check_all(src: &str) -> CheckOutput {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(2_000))]
+    #![proptest_config(ProptestConfig::with_cases(3_000))]
 
     // L03-T30
     #[test]
