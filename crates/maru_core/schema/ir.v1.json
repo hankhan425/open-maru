@@ -1,0 +1,696 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openmaru.org/schema/ir.v1.json",
+  "title": "maru IR v1",
+  "description": "The normalized intermediate representation of a checked maru spec (SPEC-01 §6). Every field is present; optional values without a default are null. Money is integer micro-USD.",
+  "type": "object",
+  "properties": {
+    "ir_version": {
+      "const": 1
+    },
+    "source_hash": {
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "org": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "purpose": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "membership": {
+          "$ref": "#/$defs/membership"
+        },
+        "amend": {
+          "$ref": "#/$defs/amend"
+        },
+        "circles": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/circle"
+          }
+        },
+        "agents": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/agent"
+          }
+        },
+        "goals": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/goal"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "purpose",
+        "membership",
+        "amend",
+        "circles",
+        "agents",
+        "goals"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "ir_version",
+    "source_hash",
+    "org"
+  ],
+  "additionalProperties": false,
+  "$defs": {
+    "ident": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,39}$"
+    },
+    "handle": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{1,29}$",
+      "description": "A user handle without `@`."
+    },
+    "date": {
+      "type": "string",
+      "pattern": "^2[0-9]{3}-[0-9]{2}-[0-9]{2}$",
+      "description": "YYYY-MM-DD"
+    },
+    "money": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991,
+      "description": "Micro-USD, > 0 and at most 2^53 − 1."
+    },
+    "count": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2147483647
+    },
+    "duration": {
+      "type": "object",
+      "description": "A duration in the unit it was written in; `secs` is the total.",
+      "properties": {
+        "value": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "unit": {
+          "enum": [
+            "m",
+            "h",
+            "d",
+            "w",
+            "y"
+          ]
+        },
+        "secs": {
+          "type": "integer",
+          "minimum": 60,
+          "maximum": 3153600000
+        }
+      },
+      "required": [
+        "value",
+        "unit",
+        "secs"
+      ],
+      "additionalProperties": false
+    },
+    "outcome": {
+      "enum": [
+        "deny",
+        "allow"
+      ]
+    },
+    "category": {
+      "enum": [
+        "llm",
+        "compute",
+        "expense"
+      ]
+    },
+    "period": {
+      "enum": [
+        "day",
+        "week",
+        "month"
+      ]
+    },
+    "threshold": {
+      "type": "object",
+      "description": "A vote threshold as written, not reduced: `60%` is 60/100 with `percent: true`.",
+      "properties": {
+        "num": {
+          "$ref": "#/$defs/count"
+        },
+        "den": {
+          "$ref": "#/$defs/count"
+        },
+        "percent": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "num",
+        "den",
+        "percent"
+      ],
+      "additionalProperties": false
+    },
+    "procedure": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "approve"
+            },
+            "circle": {
+              "$ref": "#/$defs/ident"
+            },
+            "count": {
+              "$ref": "#/$defs/count"
+            }
+          },
+          "required": [
+            "kind",
+            "circle",
+            "count"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "description": "`circle: null` means all members.",
+          "properties": {
+            "kind": {
+              "const": "vote"
+            },
+            "circle": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/ident"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "threshold": {
+              "$ref": "#/$defs/threshold"
+            }
+          },
+          "required": [
+            "kind",
+            "circle",
+            "threshold"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "membership": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "open"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "invite"
+            },
+            "sponsors": {
+              "$ref": "#/$defs/count"
+            }
+          },
+          "required": [
+            "kind",
+            "sponsors"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "amend": {
+      "type": "object",
+      "properties": {
+        "procedure": {
+          "$ref": "#/$defs/procedure"
+        },
+        "within": {
+          "$ref": "#/$defs/duration"
+        },
+        "else": {
+          "$ref": "#/$defs/outcome"
+        }
+      },
+      "required": [
+        "procedure",
+        "within",
+        "else"
+      ],
+      "additionalProperties": false
+    },
+    "circle": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ident"
+        },
+        "seats": {
+          "$ref": "#/$defs/count"
+        },
+        "term": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/duration"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "holders": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/handle"
+          },
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "seats",
+        "term",
+        "holders"
+      ],
+      "additionalProperties": false
+    },
+    "agent": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ident"
+        },
+        "operator": {
+          "$ref": "#/$defs/handle"
+        },
+        "runtime": {
+          "enum": [
+            "byo",
+            "hosted"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "operator",
+        "runtime"
+      ],
+      "additionalProperties": false
+    },
+    "fund": {
+      "type": "object",
+      "properties": {
+        "amount_micros": {
+          "$ref": "#/$defs/money"
+        },
+        "period": {
+          "enum": [
+            "day",
+            "week",
+            "month",
+            "once"
+          ]
+        }
+      },
+      "required": [
+        "amount_micros",
+        "period"
+      ],
+      "additionalProperties": false
+    },
+    "on_close": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "return_treasury"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "transfer"
+            },
+            "goal": {
+              "$ref": "#/$defs/ident"
+            }
+          },
+          "required": [
+            "kind",
+            "goal"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "success": {
+      "type": "object",
+      "properties": {
+        "metric": {
+          "$ref": "#/$defs/ident"
+        },
+        "cmp": {
+          "enum": [
+            ">=",
+            ">",
+            "<=",
+            "<",
+            "=="
+          ]
+        },
+        "value": {
+          "type": "string",
+          "pattern": "^-?(0|[1-9][0-9]*)(\\.[0-9]+)?$"
+        },
+        "by": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/date"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "metric",
+        "cmp",
+        "value",
+        "by"
+      ],
+      "additionalProperties": false
+    },
+    "spend_limit": {
+      "type": "object",
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/category"
+        },
+        "limit_micros": {
+          "$ref": "#/$defs/money"
+        },
+        "period": {
+          "$ref": "#/$defs/period"
+        }
+      },
+      "required": [
+        "category",
+        "limit_micros",
+        "period"
+      ],
+      "additionalProperties": false
+    },
+    "mandate": {
+      "type": "object",
+      "properties": {
+        "principal": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "enum": [
+                "agent",
+                "person"
+              ]
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^[a-z0-9][a-z0-9_-]{0,39}$"
+            }
+          },
+          "required": [
+            "kind",
+            "id"
+          ],
+          "additionalProperties": false
+        },
+        "spend": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/spend_limit"
+          },
+          "maxItems": 3
+        },
+        "per_request_micros": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/money"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "capabilities": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "anyOf": [
+              {
+                "enum": [
+                  "claim_tasks",
+                  "create_tasks",
+                  "post_evidence"
+                ]
+              },
+              {
+                "type": "string",
+                "pattern": "^report_metric:[a-z][a-z0-9_]{0,39}$"
+              }
+            ]
+          }
+        },
+        "expires": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/date"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "principal",
+        "spend",
+        "per_request_micros",
+        "capabilities",
+        "expires"
+      ],
+      "additionalProperties": false
+    },
+    "subject": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "spend"
+            },
+            "category": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/category"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "over_micros": {
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/money"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            }
+          },
+          "required": [
+            "kind",
+            "category",
+            "over_micros"
+          ],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "const": "close"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "rule": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*:r_[0-9a-f]{8}$"
+        },
+        "subject": {
+          "$ref": "#/$defs/subject"
+        },
+        "procedure": {
+          "$ref": "#/$defs/procedure"
+        },
+        "within": {
+          "$ref": "#/$defs/duration"
+        },
+        "else": {
+          "$ref": "#/$defs/outcome"
+        }
+      },
+      "required": [
+        "id",
+        "subject",
+        "procedure",
+        "within",
+        "else"
+      ],
+      "additionalProperties": false
+    },
+    "goal": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/ident"
+        },
+        "title": {
+          "type": "string"
+        },
+        "purpose": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "steward": {
+          "$ref": "#/$defs/ident"
+        },
+        "fund": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/fund"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "on_underfunded": {
+          "enum": [
+            "pause",
+            "continue"
+          ]
+        },
+        "on_close": {
+          "$ref": "#/$defs/on_close"
+        },
+        "success": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/success"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "mandates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/mandate"
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/rule"
+          }
+        },
+        "limits": {
+          "type": "object",
+          "properties": {
+            "unapproved_monthly_max_micros": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          "required": [
+            "unapproved_monthly_max_micros"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "purpose",
+        "steward",
+        "fund",
+        "on_underfunded",
+        "on_close",
+        "success",
+        "mandates",
+        "rules",
+        "limits"
+      ],
+      "additionalProperties": false
+    }
+  }
+}
