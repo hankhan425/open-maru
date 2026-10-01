@@ -10,6 +10,7 @@ defmodule Openmaru.LedgerHelpers do
   import ExUnit.Assertions
   import Mox
 
+  alias Ecto.Adapters.SQL.Sandbox
   alias Openmaru.{ClockMock, Ledger, Repo, UUIDv7}
 
   @i64_max 9_223_372_036_854_775_807
@@ -119,7 +120,7 @@ defmodule Openmaru.LedgerHelpers do
   `delete_committed!/1`.
   """
   @spec unboxed((-> result)) :: result when result: term()
-  def unboxed(fun), do: Ecto.Adapters.SQL.Sandbox.unboxed_run(Repo, fun)
+  def unboxed(fun), do: Sandbox.unboxed_run(Repo, fun)
 
   @doc """
   Deletes committed ledger rows that touch `account_ids`, and the accounts themselves.
@@ -128,41 +129,38 @@ defmodule Openmaru.LedgerHelpers do
   @spec delete_committed!([Ecto.UUID.t()]) :: :ok
   def delete_committed!(account_ids) do
     ids = Enum.map(account_ids, &Ecto.UUID.dump!/1)
+    {:ok, :ok} = unboxed(fn -> Repo.transaction(fn -> delete_rows!(ids) end) end)
+    :ok
+  end
 
-    unboxed(fn ->
-      {:ok, :ok} =
-        Repo.transaction(fn ->
-          for table <- ~w(ledger_transfers ledger_accounts),
-              do: Repo.query!("ALTER TABLE #{table} DISABLE TRIGGER USER")
+  defp delete_rows!(ids) do
+    for table <- ~w(ledger_transfers ledger_accounts),
+        do: Repo.query!("ALTER TABLE #{table} DISABLE TRIGGER USER")
 
-          Repo.query!(
-            """
-            DELETE FROM ledger_pending_expiries WHERE pending_id IN
-              (SELECT id FROM ledger_transfers
-               WHERE debit_account_id = ANY($1) OR credit_account_id = ANY($1))
-            """,
-            [ids]
-          )
+    Repo.query!(
+      """
+      DELETE FROM ledger_pending_expiries WHERE pending_id IN
+        (SELECT id FROM ledger_transfers
+         WHERE debit_account_id = ANY($1) OR credit_account_id = ANY($1))
+      """,
+      [ids]
+    )
 
-          # Resolutions reference their pending transfers, so delete them first.
-          Repo.query!(
-            "DELETE FROM ledger_transfers WHERE pending_id IS NOT NULL AND (debit_account_id = ANY($1) OR credit_account_id = ANY($1))",
-            [ids]
-          )
+    # Resolutions reference their pending transfers, so delete them first.
+    Repo.query!(
+      "DELETE FROM ledger_transfers WHERE pending_id IS NOT NULL AND (debit_account_id = ANY($1) OR credit_account_id = ANY($1))",
+      [ids]
+    )
 
-          Repo.query!(
-            "DELETE FROM ledger_transfers WHERE debit_account_id = ANY($1) OR credit_account_id = ANY($1)",
-            [ids]
-          )
+    Repo.query!(
+      "DELETE FROM ledger_transfers WHERE debit_account_id = ANY($1) OR credit_account_id = ANY($1)",
+      [ids]
+    )
 
-          Repo.query!("DELETE FROM ledger_accounts WHERE id = ANY($1)", [ids])
+    Repo.query!("DELETE FROM ledger_accounts WHERE id = ANY($1)", [ids])
 
-          for table <- ~w(ledger_transfers ledger_accounts),
-              do: Repo.query!("ALTER TABLE #{table} ENABLE TRIGGER USER")
-
-          :ok
-        end)
-    end)
+    for table <- ~w(ledger_transfers ledger_accounts),
+        do: Repo.query!("ALTER TABLE #{table} ENABLE TRIGGER USER")
 
     :ok
   end

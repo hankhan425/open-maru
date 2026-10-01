@@ -362,8 +362,14 @@ defmodule Openmaru.Ledger.TransfersTest do
       assert head_seq() == seq
       assert snapshot([a, b, c]) == before
 
-      # Each transfer on its own is also an exact replay.
-      for x <- batch, do: assert(Ledger.create_transfers([x]) == [{:ok, :exists}])
+      # Each unlinked transfer on its own is also an exact replay (a linked one alone would
+      # be an open chain).
+      for x <- batch,
+          :linked not in x.flags,
+          do: assert(Ledger.create_transfers([x]) == [{:ok, :exists}])
+
+      [linked | _] = for x <- batch, :linked in x.flags, do: x
+      assert Ledger.create_transfers([linked]) == [{:error, :linked_event_chain_open}]
     end
 
     test "G01-T05 a post replay matches whether accounts, code and amount were omitted or given" do

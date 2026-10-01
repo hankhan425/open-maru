@@ -9,10 +9,12 @@ defmodule Openmaru.Ledger.ExpiryTest do
 
   @t0 ~U[2026-10-01 12:00:00.000000Z]
 
+  # Funding happens a second earlier, so the first pending transfer is stamped exactly @t0.
   setup do
-    set_clock(@t0)
+    set_clock(DateTime.add(@t0, -1, :second))
     a = dmnec!() |> fund!(100)
     b = account!()
+    set_clock(@t0)
     %{a: a, b: b}
   end
 

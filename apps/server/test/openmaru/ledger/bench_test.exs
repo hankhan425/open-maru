@@ -41,17 +41,19 @@ defmodule Openmaru.Ledger.BenchTest do
     ]
   end
 
+  defp create_all!(batch) do
+    results = Ledger.create_transfers(batch)
+    true = Enum.all?(results, &(&1 == {:ok, :created}))
+  end
+
   defp measure(label, accounts, pairs, pairs_per_call) do
     calls = div(pairs, pairs_per_call)
 
-    {micros, _} =
-      :timer.tc(fn ->
-        for _ <- 1..calls do
-          batch = Enum.flat_map(1..pairs_per_call, fn _ -> hold_pair(accounts) end)
-          results = unboxed(fn -> Ledger.create_transfers(batch) end)
-          true = Enum.all?(results, &(&1 == {:ok, :created}))
-        end
-      end)
+    batches =
+      for _ <- 1..calls, do: Enum.flat_map(1..pairs_per_call, fn _ -> hold_pair(accounts) end)
+
+    # One connection outside the sandbox for the run; each call is its own transaction.
+    {micros, _} = :timer.tc(fn -> unboxed(fn -> Enum.each(batches, &create_all!/1) end) end)
 
     rate = pairs * 1_000_000 / micros
 

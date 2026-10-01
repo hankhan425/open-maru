@@ -199,7 +199,16 @@ defmodule Openmaru.Ledger.PropertyTest do
 
   defp assert_invariants!(state) do
     accounts = Ledger.lookup_accounts(state.accounts)
+    assert_sums_of_transfers!(accounts)
+    assert_zero_sum!()
+    assert_limits!(accounts)
+    assert_resolved_at_most_once!()
+    # 6 (bonus): the chain verifies from seq 1.
+    assert Ledger.verify_chain(1, head_seq()) == :ok
+  end
 
+  # 1. Every account's balances equal the sums of its transfers.
+  defp assert_sums_of_transfers!(accounts) do
     %{rows: rows} =
       Repo.query!(
         "SELECT id, debit_account_id, credit_account_id, amount, pending_id, flags FROM ledger_transfers"
@@ -219,31 +228,31 @@ defmodule Openmaru.Ledger.PropertyTest do
 
     resolved = MapSet.new(for %{pending_id: p} when not is_nil(p) <- transfers, do: p)
 
-    # 1. Every account's balances equal the sums of its transfers.
     for account <- accounts do
-      expected =
-        Enum.reduce(transfers, bal(), fn t, acc ->
-          pending? = Bitwise.band(t.flags, 2) != 0
-          void? = Bitwise.band(t.flags, 8) != 0
-
-          column =
-            cond do
-              pending? and not MapSet.member?(resolved, t.id) -> :pending
-              pending? or void? -> nil
-              true -> :posted
-            end
-
-          acc
-          |> add(column, :debits, t.debit == account.id, t.amount)
-          |> add(column, :credits, t.credit == account.id, t.amount)
-        end)
-
+      expected = Enum.reduce(transfers, bal(), &add_leg(&1, &2, account.id, resolved))
       assert Map.take(account, Map.keys(expected)) == expected, "balances of #{account.id}"
     end
 
     assert Ledger.verify_balances() == :ok
+  end
 
-    # 2. Posted and pending balances each sum to zero across all accounts.
+  # An open pending counts as pending; plain transfers and posts as posted; voids and
+  # resolved pendings nowhere.
+  defp add_leg(t, acc, account_id, resolved) do
+    column =
+      cond do
+        Bitwise.band(t.flags, 2) != 0 and not MapSet.member?(resolved, t.id) -> :pending
+        Bitwise.band(t.flags, 2 + 8) != 0 -> nil
+        true -> :posted
+      end
+
+    acc
+    |> add(column, :debits, t.debit == account_id, t.amount)
+    |> add(column, :credits, t.credit == account_id, t.amount)
+  end
+
+  # 2. Posted and pending balances each sum to zero across all accounts.
+  defp assert_zero_sum! do
     %{rows: [[posted, pending]]} =
       Repo.query!("""
       SELECT coalesce(sum(credits_posted - debits_posted), 0)::bigint,
@@ -252,26 +261,25 @@ defmodule Openmaru.Ledger.PropertyTest do
       """)
 
     assert {posted, pending} == {0, 0}
+  end
 
-    # 3. Balance-constrained accounts never exceed their limits.
-    for account <- accounts do
-      if :debits_must_not_exceed_credits in account.flags,
-        do: assert(account.debits_pending + account.debits_posted <= account.credits_posted)
+  # 3. Balance-constrained accounts never exceed their limits.
+  defp assert_limits!(accounts) do
+    for %{flags: [:debits_must_not_exceed_credits]} = a <- accounts,
+        do: assert(a.debits_pending + a.debits_posted <= a.credits_posted)
 
-      if :credits_must_not_exceed_debits in account.flags,
-        do: assert(account.credits_pending + account.credits_posted <= account.debits_posted)
-    end
+    for %{flags: [:credits_must_not_exceed_debits]} = a <- accounts,
+        do: assert(a.credits_pending + a.credits_posted <= a.debits_posted)
+  end
 
-    # 4. A pending transfer resolves (post, void or expiry) at most once.
+  # 4. A pending transfer resolves (post, void or expiry) at most once.
+  defp assert_resolved_at_most_once! do
     %{rows: twice} =
       Repo.query!(
         "SELECT pending_id FROM ledger_transfers WHERE pending_id IS NOT NULL GROUP BY pending_id HAVING count(*) > 1"
       )
 
     assert twice == []
-
-    # 6 (bonus): the chain verifies from seq 1.
-    assert Ledger.verify_chain(1, head_seq()) == :ok
   end
 
   defp add(acc, nil, _side, _match?, _amount), do: acc

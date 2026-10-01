@@ -105,4 +105,31 @@ defmodule Openmaru.Ledger.ImmutabilityTest do
 
     assert %{postgres: %{code: :unique_violation}} = error
   end
+
+  test "G01-T14 a checkpoint row is immutable except that its anchor can be set once" do
+    id = Ecto.UUID.dump!(Openmaru.UUIDv7.generate())
+    hash = :binary.copy(<<1>>, 32)
+
+    Repo.query!(
+      """
+      INSERT INTO ledger_checkpoints (id, date, first_seq, last_seq, count, head_hash,
+        prev_checkpoint_hash, checkpoint_hash, inserted_at)
+      VALUES ($1, '2026-09-30', 1, 3, 3, $2, $2, $2, now())
+      """,
+      [id, hash]
+    )
+
+    %{num_rows: 1} =
+      Repo.query!(~s(UPDATE ledger_checkpoints SET anchor = '{"tx": "abc"}' WHERE id = $1), [id])
+
+    for sql <- [
+          ~s(UPDATE ledger_checkpoints SET anchor = '{"tx": "other"}' WHERE id = $1),
+          "UPDATE ledger_checkpoints SET count = 4 WHERE id = $1",
+          "DELETE FROM ledger_checkpoints WHERE id = $1"
+        ] do
+      assert rejected?(sql, [id]), sql
+    end
+
+    assert rejected?("TRUNCATE ledger_checkpoints", [])
+  end
 end

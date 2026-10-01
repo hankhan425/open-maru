@@ -94,6 +94,7 @@ defmodule Openmaru.Ledger.ChainTest do
                  seq: int(json["seq"])
                } == %{
                  Map.take(row, [
+                   :flags,
                    :id,
                    :debit_account_id,
                    :credit_account_id,
@@ -152,9 +153,12 @@ defmodule Openmaru.Ledger.ChainTest do
       [_, x | _] = some_transfers!(4)
       assert Ledger.verify_chain(1, 4) == :ok
 
-      tamper!("UPDATE ledger_transfers SET amount = amount + 1 WHERE id = $1", [
-        Ecto.UUID.dump!(x.id)
-      ])
+      tamper!(
+        "UPDATE ledger_transfers SET amount = amount + 1, requested_amount = requested_amount + 1 WHERE id = $1",
+        [
+          Ecto.UUID.dump!(x.id)
+        ]
+      )
 
       assert Ledger.verify_chain(1, 4) == {:error, {:hash_mismatch, 2}}
       assert Ledger.verify_chain(2, 2) == {:error, {:hash_mismatch, 2}}
