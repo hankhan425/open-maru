@@ -1018,3 +1018,35 @@ fn l03_output_json_shape() {
     assert!(d["span"]["start"]["line"].is_u64());
     assert!(d["notes"].is_array());
 }
+
+// L03 extra: suggestion lookups share a work budget, so thousands of unknown references
+// cannot make a check slow. Here 3,000 declared agents and 400 unknown principals that
+// are not close to any of them spend the budget, so a later near miss gets no note, while
+// the same near miss on its own does.
+#[test]
+fn l03_suggestions_have_a_work_budget() {
+    let agents: String = (0..3_000)
+        .map(|i| format!("\n  agent a{i:05} {{\n    operator: @mina\n  }}\n"))
+        .collect();
+    let far: String = (0..400)
+        .map(|i| format!("\n    mandate xyz{i:03} {{}}\n"))
+        .collect();
+    let near = "\n    mandate a0000 {}\n";
+    let lone = spec(&agents, near);
+    let d = run(&lone)
+        .diagnostics
+        .into_iter()
+        .find(|d| d.code == Code::E303)
+        .unwrap();
+    assert_eq!(d.notes, ["did you mean `a00000`?"]);
+
+    let flood = spec(&agents, &format!("{far}{near}"));
+    let out = run(&flood);
+    let unknown: Vec<_> = out
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == Code::E303)
+        .collect();
+    assert_eq!(unknown.len(), 401);
+    assert!(unknown.iter().all(|d| d.notes.is_empty()));
+}
