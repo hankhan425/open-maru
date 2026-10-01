@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 pub mod printer;
+pub mod strategies;
 
 use maru_core::ast::*;
 use maru_core::{Code, ParseOutput, Span, parse};
@@ -27,6 +28,69 @@ pub fn ast_json(file: &File) -> Value {
     let mut v = serde_json::to_value(file).expect("AST serializes");
     strip_spans(&mut v);
     v
+}
+
+/// The fields of [`File`], [`Item`] and [`Block`] that hold comments.
+const TRIVIA_KEYS: &[&str] = &[
+    "leading",
+    "trailing",
+    "open_comment",
+    "end_comments",
+    "trailing_comments",
+];
+
+/// Removes every comment field, recursively.
+pub fn strip_trivia(v: &mut Value) {
+    match v {
+        Value::Object(map) => {
+            map.retain(|k, _| !TRIVIA_KEYS.contains(&k.as_str()));
+            map.values_mut().for_each(strip_trivia);
+        }
+        Value::Array(items) => items.iter_mut().for_each(strip_trivia),
+        _ => {}
+    }
+}
+
+/// The AST as JSON without spans or comments: what the formatter must preserve
+/// (SPEC-01 §7).
+pub fn ast_json_no_trivia(file: &File) -> Value {
+    let mut v = ast_json(file);
+    strip_trivia(&mut v);
+    v
+}
+
+/// The AST as JSON without spans and with trailing whitespace trimmed from comment
+/// texts, as the formatter trims them.
+pub fn ast_json_trimmed_comments(file: &File) -> Value {
+    fn trim(v: &mut Value) {
+        match v {
+            Value::Object(map) => {
+                // Only comments have a `text` field.
+                if let Some(Value::String(text)) = map.get_mut("text") {
+                    *text = text.trim_end().to_string();
+                }
+                map.values_mut().for_each(trim);
+            }
+            Value::Array(items) => items.iter_mut().for_each(trim),
+            _ => {}
+        }
+    }
+    let mut v = ast_json(file);
+    trim(&mut v);
+    v
+}
+
+/// Asserts the formatter's rules for text (L02-T11): LF line endings, no trailing
+/// whitespace, exactly one final newline.
+pub fn assert_clean_text(out: &str) {
+    assert!(!out.contains("\r\n"), "CRLF in output:\n{out:?}");
+    assert!(
+        out.ends_with('\n') && !out.ends_with("\n\n"),
+        "output must end with exactly one newline:\n{out:?}"
+    );
+    for line in out.split('\n') {
+        assert_eq!(line, line.trim_end(), "trailing whitespace in {out:?}");
+    }
 }
 
 /// Parses `src`, asserting there are no diagnostics.
