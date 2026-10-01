@@ -14,6 +14,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::ast;
+
 /// The IR format version, `ir_version` in the JSON.
 pub const IR_VERSION: u32 = 1;
 
@@ -391,4 +393,132 @@ pub enum Outcome {
 pub struct Limits {
     /// Upper bound on spend possible in one calendar month without approvals.
     pub unapproved_monthly_max_micros: u64,
+}
+
+// ---- lowering of leaf values from the syntax tree ----
+
+impl From<&ast::Duration> for Duration {
+    fn from(d: &ast::Duration) -> Duration {
+        Duration {
+            value: d.value,
+            unit: DurationUnit::from(d.unit),
+            secs: d.secs(),
+        }
+    }
+}
+
+impl From<ast::DurationUnit> for DurationUnit {
+    fn from(u: ast::DurationUnit) -> DurationUnit {
+        match u {
+            ast::DurationUnit::Minutes => DurationUnit::Minutes,
+            ast::DurationUnit::Hours => DurationUnit::Hours,
+            ast::DurationUnit::Days => DurationUnit::Days,
+            ast::DurationUnit::Weeks => DurationUnit::Weeks,
+            ast::DurationUnit::Years => DurationUnit::Years,
+        }
+    }
+}
+
+impl From<ast::Outcome> for Outcome {
+    fn from(o: ast::Outcome) -> Outcome {
+        match o {
+            ast::Outcome::Deny => Outcome::Deny,
+            ast::Outcome::Allow => Outcome::Allow,
+        }
+    }
+}
+
+impl From<ast::Runtime> for Runtime {
+    fn from(r: ast::Runtime) -> Runtime {
+        match r {
+            ast::Runtime::Byo => Runtime::Byo,
+            ast::Runtime::Hosted => Runtime::Hosted,
+        }
+    }
+}
+
+impl From<ast::Underfunded> for Underfunded {
+    fn from(u: ast::Underfunded) -> Underfunded {
+        match u {
+            ast::Underfunded::Pause => Underfunded::Pause,
+            ast::Underfunded::Continue => Underfunded::Continue,
+        }
+    }
+}
+
+impl From<ast::Category> for Category {
+    fn from(c: ast::Category) -> Category {
+        match c {
+            ast::Category::Llm => Category::Llm,
+            ast::Category::Compute => Category::Compute,
+            ast::Category::Expense => Category::Expense,
+        }
+    }
+}
+
+impl From<ast::Period> for Period {
+    fn from(p: ast::Period) -> Period {
+        match p {
+            ast::Period::Day => Period::Day,
+            ast::Period::Week => Period::Week,
+            ast::Period::Month => Period::Month,
+        }
+    }
+}
+
+impl From<&ast::Fund> for Fund {
+    fn from(f: &ast::Fund) -> Fund {
+        Fund {
+            amount_micros: f.amount.micros,
+            period: match f.schedule {
+                ast::FundSchedule::Every(ast::Period::Day) => FundPeriod::Day,
+                ast::FundSchedule::Every(ast::Period::Week) => FundPeriod::Week,
+                ast::FundSchedule::Every(ast::Period::Month) => FundPeriod::Month,
+                ast::FundSchedule::Once => FundPeriod::Once,
+            },
+        }
+    }
+}
+
+impl From<&ast::SpendLimit> for SpendLimit {
+    fn from(s: &ast::SpendLimit) -> SpendLimit {
+        SpendLimit {
+            category: Category::from(s.category),
+            limit_micros: s.limit.micros,
+            period: Period::from(s.period),
+        }
+    }
+}
+
+impl From<ast::Cmp> for Cmp {
+    fn from(c: ast::Cmp) -> Cmp {
+        match c {
+            ast::Cmp::Ge => Cmp::Ge,
+            ast::Cmp::Gt => Cmp::Gt,
+            ast::Cmp::Le => Cmp::Le,
+            ast::Cmp::Lt => Cmp::Lt,
+            ast::Cmp::Eq => Cmp::Eq,
+        }
+    }
+}
+
+impl From<&ast::Success> for Success {
+    fn from(s: &ast::Success) -> Success {
+        let v = &s.value;
+        let mut value = String::with_capacity(v.int.len() + 2);
+        if v.negative {
+            value.push('-');
+        }
+        value.push_str(&v.int);
+        if let Some(frac) = &v.frac {
+            value.push('.');
+            value.push_str(frac);
+        }
+        Success {
+            metric: s.metric.name.clone(),
+            cmp: Cmp::from(s.cmp),
+            value,
+            by: s.by.as_ref().map(ast::Date::to_iso),
+        }
+    }
 }
