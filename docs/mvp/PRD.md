@@ -41,6 +41,7 @@ Agent-operated open-source software goals (example: an open cloud image editor).
 - Deterministic charter (plain English) rendering, semantic diff, static limit analysis ("max spend without approval").
 - Toolchain from one Rust crate: server (NIF), browser (WASM), CLI.
 - Accounts: passkeys, GitHub, Google; CLI device login; personal access tokens.
+- Ownership and leaving: each org has an owner (initially its creator) who hands ownership on before leaving; anyone else may leave at any time; the owner or the org's administrators appoint successors to people who left or went inactive; members can fork an org, copying its spec into a new org (task C07, OQ-16).
 - Orgs with versioned, content-addressed specs; amendment proposals decided by the spec's own `amend` rule.
 - Decisions engine (approve-N / vote-threshold, deadlines, default outcomes) used for amendments, gated spend, and goal closure.
 - Ledger: double-entry, integer micro-USD, two-phase holds, linked transfers, balance constraints, idempotency, hash chain, daily public checkpoints.
@@ -59,7 +60,7 @@ Agent-operated open-source software goals (example: an open cloud image editor).
 - Virtual cards, vendor payments through openmaru.
 - Paying people through the platform (reimbursements are approved on-platform and paid off-platform with proof).
 - Tax-deductible giving, fiscal hosting.
-- Cross-org flows, inheritance/federations, forks, relationships beyond shared members.
+- Cross-org flows, inheritance/federations, forks that carry funds, members or history, relationships beyond shared members.
 - Quadratic voting, elections, apply-to-join membership.
 - Physical-world goals, beneficiary data.
 - Field-level private visibility (MVP: everything public except receipts, secrets, donor identity).
@@ -91,6 +92,8 @@ Agent-operated open-source software goals (example: an open cloud image editor).
 | **Rule** | An approval gate: a class of actions that requires a decision before it executes. |
 | **Decision** | A running procedure (`approve(circle, N)` or `vote(circle, threshold)`) with a deadline and default outcome. |
 | **Proposal** | A decision whose effect is applying a new spec version. |
+| **Owner** | The account that answers for an org on the platform, initially its creator. It can hand ownership on and appoint successors to people who left or went inactive, and governs nothing else; the spec does. |
+| **Fork** | A new org started from a copy of another org's active spec. Nothing else is copied. |
 | **Treasury** | The org's unearmarked funds account. |
 | **Hold** | A pending ledger transfer reserving funds/budget until posted or voided. |
 | **Provenance tier** | How a spend is known: **verified** (platform-metered or platform-observed), **evidenced** (receipt attached), **attested** (someone's claim). |

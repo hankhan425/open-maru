@@ -2,7 +2,7 @@
 
 | Epic | Depends on | Size | Wave |
 |---|---|---|---|
-| Hardening | A06, G04, P03, W03 | M | 15 |
+| Hardening | A06, G04, P03, W03, C07 | M | 15 |
 
 **Read first:** SPEC-09 (all); ARCHITECTURE §7; CONVENTIONS §6.
 **Paths:** `apps/server/lib/openmaru_web/{endpoint,router}.ex`, plugs, `lib/openmaru/admin/**`, `Dockerfile`, `rel/`, `docs/ops/`
@@ -28,7 +28,7 @@ Close the gaps a reviewer would find: uniform rate limits, headers, CORS, audit 
 - [ ] **H02-T05** Suspended org: public read-only with notice; spend → `forbidden`; checkout → 409; unsuspend restores.
 - [ ] **H02-T06** Suspended user: sessions, PATs, and person mandate tokens rejected.
 - [ ] **H02-T07** Meta-test: every non-public route in the router has at least one test tagged `@tag authz: "<route>"` covering an allowed and a denied case.
-- [ ] **H02-T08** Account deletion removes email, OAuth identities, passkeys and display name and sets `deleted_at`; the handle is unchanged and a new user cannot take it; the user JSON and web show the account as deleted; votes and ledger history remain (SPEC-09 §4, OQ-7).
+- [ ] **H02-T08** Account deletion removes email, OAuth identities, passkeys and display name, revokes the user's sessions, PATs and mandate tokens, and sets `deleted_at`; it follows C07's departure rules (OQ-16): refused with 409 `ownership_transfer_required` while the user owns an org, otherwise the user leaves every org first; the handle is unchanged and a new user cannot take it; the user JSON and web show the account as deleted; votes and ledger history remain (SPEC-09 §4, OQ-7).
 - [ ] **H02-T09** CI builds the Docker image, runs migrations, and the container healthcheck passes.
 - [ ] **H02-T10** Restore drill: `pg_dump` of a seeded DB restored into a fresh DB; `verify_chain` and `verify_balances` pass.
 - [ ] **H02-T11** End-to-end log capture of a gateway call and a secret write contains no token, key, or prompt text.

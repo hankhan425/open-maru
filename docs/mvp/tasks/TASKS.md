@@ -1,6 +1,6 @@
 # Task index
 
-46 tasks. Each file is self-contained: goal, spec sections to read, deliverables, interfaces, **tests to write first** (with IDs), acceptance criteria, and scope limits. Send each with `AGENT_PROMPT.md`.
+47 tasks. Each file is self-contained: goal, spec sections to read, deliverables, interfaces, **tests to write first** (with IDs), acceptance criteria, and scope limits. Send each with `AGENT_PROMPT.md`.
 
 Sizes: **S** ≤ ½ day, **M** ≈ 1 day, **L** ≈ 2–3 days of focused agent work.
 
@@ -21,7 +21,7 @@ Sizes: **S** ≤ ½ day, **M** ≈ 1 day, **L** ≈ 2–3 days of focused agent 
 | 10 | C06, W02, A02, P03 |
 | 11 | G03, W03, A05 |
 | 12 | G04, A03, A06, F05 |
-| 13 | G05 (optional), A04, F06 |
+| 13 | G05 (optional), A04, F06, C07 |
 | 14 | F07, F08 |
 | 15 | H01, H02 |
 
@@ -48,6 +48,7 @@ Sizes: **S** ≤ ½ day, **M** ≈ 1 day, **L** ≈ 2–3 days of focused agent 
 | [C04](C04-decisions-proposals.md) | Decisions engine & amendment proposals | Core | C03 | L |
 | [C05](C05-activity-channels.md) | Activity log, PubSub, channels | Core | C03 | M |
 | [C06](C06-goal-lifecycle.md) | Goal lifecycle, metrics, closing | Core | C04, G02, M02 | M |
+| [C07](C07-ownership-succession-forks.md) | Ownership, leaving, succession, forks | Core | C04, M02, A06, F04, F05 | L |
 | [G01](G01-ledger-core.md) | Ledger core | Ledger | T02 | L |
 | [G02](G02-goal-funding-budgets.md) | Goal accounts, allocation, budgets | Ledger | G01, C03 | L |
 | [G03](G03-expenses.md) | Expense claims & reimbursement records | Ledger | M02, A02 | M |
@@ -76,7 +77,7 @@ Sizes: **S** ≤ ½ day, **M** ≈ 1 day, **L** ≈ 2–3 days of focused agent 
 | [F07](F07-donations-payments-ui.md) | Donation flow & payments settings | Web | F06, P02, P03 | M |
 | [F08](F08-agents-admin-ui.md) | Agents, mandates, tokens, secrets, kill switch UI | Web | F06, A05, A06, W01 | M |
 | [H01](H01-e2e.md) | End-to-end happy path | Hardening | all | L |
-| [H02](H02-security-ops.md) | Security & ops hardening | Hardening | all backend | M |
+| [H02](H02-security-ops.md) | Security & ops hardening | Hardening | all backend (incl. C07) | M |
 
 ## Dependency graph
 
@@ -107,6 +108,7 @@ graph LR
   A02 & G03 & G04 & C06-->A04
   A01 & W02-->A05
   A05 & C06-->A06
+  C04 & M02 & A06 & F04 & F05-->C07
   C01 & C02 & L04-->F01
   F01 & C05-->F02
   F01-->F03
@@ -115,8 +117,8 @@ graph LR
   F03 & G04 & A02 & C06-->F06
   F06 & P02 & P03-->F07
   F06 & A05 & A06 & W01-->F08
-  F07 & F08 & A03 & A04 & W03-->H01
-  A06 & G04 & P03 & W03-->H02
+  F07 & F08 & A03 & A04 & W03 & C07-->H01
+  A06 & G04 & P03 & W03 & C07-->H02
 ```
 
 ## Cross-task contracts

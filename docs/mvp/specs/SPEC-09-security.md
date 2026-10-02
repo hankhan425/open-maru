@@ -28,7 +28,7 @@
 | Emails | private; never in public payloads |
 | Mandate token metadata | members only |
 
-Account deletion: removes PII (email, OAuth identities, passkeys; display name cleared) and sets `users.deleted_at`. The handle is kept and stays taken; the API and web show the account as deleted. Ledger, votes, and activity remain with that pseudonymous handle (immutable history; OQ-7).
+Account deletion: removes PII (email, OAuth identities, passkeys; display name cleared), revokes the user's sessions, PATs and mandate tokens, and sets `users.deleted_at`. What it does to the orgs the user belongs to is open (OQ-16, task C07): the user leaves every org first, and an org's owner must transfer ownership before deleting. The handle is kept and stays taken; the API and web show the account as deleted. Ledger, votes, and activity remain with that pseudonymous handle (immutable history; OQ-7).
 
 ## 5. Uploads
 Presigned PUT to private bucket; max 10 MB; allowed types: `application/pdf`, `image/png`, `image/jpeg`, `image/webp`, `text/plain`; SHA-256 verified on `complete`; object keys are random; no server-side fetching of user-provided URLs (no SSRF surface).

@@ -192,6 +192,8 @@ ARCHITECTURE > PRD.
   removing it, that is a separate path after the MVP. SPEC-09 §4, SPEC-02 §2 and H02-T08 are
   updated. C01's `deleted-user-` prefix reservation stays, so no live handle reads as a deleted
   account.
+- **Follow-up:** what deletion and leaving do to the person's roles in their orgs is OQ-16 (open;
+  task C07).
 
 ### OQ-8: The email field on the sign-in card
 - **Task:** C01 (affects F01)
@@ -409,3 +411,59 @@ ARCHITECTURE > PRD.
   (`CompileError::DuplicatePolicyId`), which the checker no longer emits. Tests: L03-T33
   (`l03_t33_rules_with_one_id_in_a_goal_is_e325`), `l06_rules_with_colliding_ids_do_not_compile`
   (now on an IR edited after checking).
+
+### OQ-16: A person who leaves, deletes their account or goes inactive while the org needs them
+- **Task:** review of OQ-7 (affects C03, C04, M02, H02; new task C07)
+- **Status:** open
+- **Conflict:** OQ-7 kept a deleted user's handle but did not say what happens to that user's
+  roles in the orgs they belong to.
+  - **A deleted holder keeps counting.** Effective holders (SPEC-02 §3.4) don't look at
+    `deleted_at`, so the account still counts in every vote and approval. In lumen
+    (`amend: vote(core, 2/3)`, holders @mina and @jo), if jo deletes their account, 2 of 2 votes
+    are required for good. Every amendment fails, including one that removes jo. Once the terms
+    lapse, the holdover rule brings both back as eligible. Spend approvals and closing then fail
+    with `no_eligible_voters`.
+  - **Agents lose their accountable human.** A deleted operator's agent keeps valid tokens for
+    up to 90 days.
+  - **The leave rule is wrong both ways.** Deletion gets around SPEC-02 §3.5's rule that holders
+    and operators can't leave while listed. And that rule means a holder can never leave without
+    the org's consent.
+- **Options:**
+  - (a) Refuse deletion while the user is listed, as for leaving.
+  - (b) Leaving and deletion end the person's roles at once, and the amend rule shrinks to who
+    remains: all remaining holders, or all members by a two-thirds vote if the circle is empty.
+  - (c) As (b), but spend approvals and closing shrink too.
+  - (d) The user's direction below.
+- **Direction (user, 2026-10-02):**
+  - An org has an owner, who must transfer ownership before leaving or deleting their account.
+  - Everyone else may leave.
+  - When a member leaves or becomes inactive, the owner or the administrators decide who takes
+    over their roles.
+  - If the owner becomes inactive, members can fork the org.
+
+  This was too large for the review PR, so it is task C07. Successions refill a circle, so the
+  shrinking amend rule of (b) is not needed.
+- **Proposed (confirm before C07 starts; details in C07):**
+  1. **Owner.** A platform role outside the spec, one per org, initially the creator. Its powers
+     are transferring ownership and deciding successions. Transfer needs the recipient's
+     acceptance.
+  2. **Leaving.** Leaving ends membership, seats, operator roles (agents stopped) and mandates
+     (tokens revoked) at once. The spec still names the person until a succession or amendment.
+     Rejoining restores neither seats nor mandates.
+  3. **Inactive.** No authenticated activity for 90 days. The person is notified when a
+     succession starts, and an objection within 7 days cancels it.
+  4. **Succession.** It passes on the owner's approval, or on a majority of the remaining
+     administrators (SPEC-05 §2), within 7 days. It replaces the person's handle with the
+     successor's everywhere and changes nothing else.
+     - This makes it the one spec change that bypasses the `amend` rule (SPEC-01 §4.1). It is
+       limited to people who left or are inactive, and the org page states it.
+     - Should the charter state it too?
+  5. **Fork.** A fork copies only the active spec into a new org, which the forker creates and
+     owns. No funds, members, Stripe account or history are copied, and the two orgs link to each
+     other. PRD §6 now has such forks in scope.
+  6. **Suspension.** A suspended holder still counts in votes too. Should suspension (SPEC-09
+     §6) take the person out of eligibility while it lasts?
+- **Chosen (interim):** the current specs. Holders and operators can't leave while listed
+  (C03-T17). Account deletion is H02, which comes after C07 and follows it. H02-T08 also revokes
+  the deleted user's sessions, PATs and mandate tokens.
+- **Resolution:**

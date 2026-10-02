@@ -71,7 +71,7 @@ Runs in the activation transaction of each version:
 ### 3.5 Membership
 - `open()`: `POST /orgs/:slug/membership` joins immediately.
 - `invite(sponsors: N)`: members sponsor a candidate (`POST /orgs/:slug/sponsorships {handle}`); when distinct sponsors ≥ N the candidate becomes a member (`member.joined`). Candidates can't sponsor themselves.
-- Leaving: `DELETE /orgs/:slug/membership`; holders/operators cannot leave while listed (`must_be_removed_by_amendment`).
+- Leaving: `DELETE /orgs/:slug/membership`; holders/operators cannot leave while listed (`must_be_removed_by_amendment`). OQ-16 (open; task C07) replaces this rule: anyone but the org's owner may leave, and the owner or the administrators appoint successors.
 
 ## 4. Decisions engine
 

@@ -36,7 +36,7 @@ Orgs exist as versioned, content-addressed specs. Activating a version projects 
 - [ ] **C03-T14** `GET /orgs/:slug` returns circles with effective and pending holders, goals summary, member count; `GET /orgs/:slug/spec` and `/spec/versions[/:n]`; unknown → 404.
 - [ ] **C03-T15** `open()` join → `member.joined`; joining twice is idempotent.
 - [ ] **C03-T16** `invite(sponsors: 2)`: one sponsor → not a member; second distinct sponsor → member; self-sponsor → 403; non-member sponsor → 403.
-- [ ] **C03-T17** Leave: ordinary member OK; listed holder or operator → 409 `must_be_removed_by_amendment`.
+- [ ] **C03-T17** Leave: ordinary member OK; listed holder or operator → 409 `must_be_removed_by_amendment` (C07 replaces this rule later; OQ-16).
 - [ ] **C03-T18** `GET /public/world`: two orgs sharing two members → one edge with weight 2; goal summaries included.
 - [ ] **C03-T19** Suspended org shows `status: suspended`; suspended user cannot create orgs (403).
 - [ ] **C03-T20** Architecture test: only `Openmaru.Lang` references `Openmaru.Lang.Native` (xref).
