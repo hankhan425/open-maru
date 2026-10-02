@@ -7,10 +7,12 @@
 #![warn(missing_docs)]
 
 pub mod ast;
+pub mod charter;
 pub mod check;
 pub mod diag;
 mod error;
 pub mod fmt;
+pub mod human;
 pub mod ir;
 pub mod lexer;
 pub mod limits;
@@ -18,6 +20,7 @@ pub mod parser;
 pub mod span;
 pub mod suggest;
 
+pub use charter::{Section, render_markdown, render_sections};
 pub use check::{CheckOptions, CheckOutput, check};
 pub use diag::{Code, Diagnostic, Severity};
 pub use error::CoreError;

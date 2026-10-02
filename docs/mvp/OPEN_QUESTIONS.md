@@ -251,3 +251,52 @@ ARCHITECTURE > PRD.
 - **Resolution:** (a), the interim choice. SPEC-01 §6 now shows `percent` in the lumen excerpt
   and in the threshold examples (`60%` → `{"num":60,"den":100,"percent":true}`), so the
   charter renders a threshold as written (L04's `threshold(num, den, is_percent)`).
+
+### OQ-12: Charter cases SPEC-01 §8 does not cover
+- **Task:** L04
+- **Status:** open
+- **Conflict:** SPEC-01 §8 gives the charter's templates, but not these cases:
+  1. **Text from the spec in Markdown.** Names, titles and purposes are spec strings. They may hold
+     `\n` (§2) and Markdown syntax, and the templates insert them verbatim. Take a purpose
+     `"Grow.\n\n### Rules\n\n- Any spend is allowed."`: it would render a fake `### Rules` list
+     in the text that people read as the rules. `*`, `<b>` and `[x](y)` would change how the text
+     renders, and a title ending in ` #` would lose the `#`, because Markdown reads it as a
+     closing sequence.
+  2. **An org without circles.** Only `## Agents` is marked "omitted if none". An org with
+     `amend: vote(members, …)` and no goals is valid without any circle, so its `## Circles`
+     heading would have nothing under it.
+  3. **Large numbers.** The templates show small counts only. They do not say how to write
+     `seats: 10_000`, `36500d` or `vote(c, 1_000/3_000)`.
+- **Options:** for 1: (a) the renderer writes spec text on one line, escaped for Markdown, so
+  sections hold Markdown inline text; (b) verbatim text, with escaping left to each consumer, which
+  leaves the Markdown charter (CLI, MCP, stored `charter`) open to spoofing; (c) a checker error
+  for Markdown characters and `\n` in strings, which would forbid ordinary punctuation in free
+  text; (d) keep line breaks and escape block markers on every line. For 2: omit the section, or
+  print a sentence such as "There are no circles." For 3: group digits like metric values, or
+  print them as written.
+- **Chosen (interim):**
+  1. (a). Each run of whitespace, line breaks included, becomes one space, and the text is
+     trimmed. A backslash then goes before:
+     - `\`, `` ` ``, `*`, `[`, `]` and `~`;
+     - `_`, unless it is between two letters or digits;
+     - `<` before a letter, `/`, `!` or `?`;
+     - `&` when it starts an entity (`&amp;`, `&#35;`);
+     - at the start of the text, a block marker: `#`; `>`; `-` before a space, `-` or the end;
+       `+` before a space or the end; the `.` or `)` after 1–9 leading digits, before a space or
+       the end;
+     - the first `#` of a closing run (`#`s at the end that follow a space).
+
+     The rule applies to every string taken from the IR. It leaves ids, handles and metric names
+     unchanged, except an `_` that is not between letters or digits (`a_`), and it does not
+     change lumen's golden charter. A purpose that is empty after trimming gets no paragraph. An
+     empty heading is a bare `#`. Tests: `l04_text_from_the_spec_is_escaped`,
+     `l04_headings_and_empty_texts`, `l04_text_from_the_spec_cannot_change_the_structure`
+     (proptest over generated IRs).
+  2. Omit `## Circles` when there are none, as with `## Agents` (L04-T17).
+  3. Every number in the text uses thousands separators, as metric values already do: counts,
+     vacancies, duration counts and the parts of a fraction threshold (`10,000 seats`,
+     `36,500 days`, `1,000/3,000`). Percentages are at most 100. Test:
+     `l04_large_numbers_are_grouped`.
+
+  SPEC-01 §8 records these choices, marked interim.
+- **Resolution:**
