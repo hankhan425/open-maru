@@ -56,7 +56,15 @@ defmodule OpenmaruWeb.FallbackControllerTest do
     slow_down: 400,
     expired_token: 400,
     access_denied: 400,
-    invalid_grant: 400
+    invalid_grant: 400,
+    not_acceptable: 406,
+    request_timeout: 408,
+    conflict: 409,
+    payload_too_large: 413,
+    uri_too_long: 414,
+    unsupported_media_type: 415,
+    internal_error: 500,
+    service_unavailable: 503
   ]
 
   for {code, status} <- @spec_codes do

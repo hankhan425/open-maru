@@ -98,8 +98,14 @@ Choosing between the generic codes: `invalid_request` (400) is a malformed reque
 | `rate_limited` | 429 | `provider_error` | 502 |
 | `gateway_timeout` | 504 | `task_not_in_goal` | 403 |
 | `authorization_pending`, `slow_down`, `expired_token` | 400 | `access_denied`, `invalid_grant` | 400 |
+| `not_acceptable` | 406 | `request_timeout` | 408 |
+| `conflict` | 409 | `payload_too_large` | 413 |
+| `uri_too_long` | 414 | `unsupported_media_type` | 415 |
+| `internal_error` | 500 | `service_unavailable` | 503 |
 
-The last row is the device login (`/auth/device/*`, RFC 8628 §3.5): `authorization_pending` (not approved yet), `slow_down` (polled less than `interval` seconds after the previous poll; the interval restarts), `expired_token` (code older than 10 minutes), `access_denied` (denied, or the approver is suspended), `invalid_grant` (unknown device code, or its token was already issued; on approve, a code already decided). An unknown user code on approve is 404 `not_found`.
+A code always determines the HTTP status, including for errors raised before or outside a controller (OQ-1). Such an error gets the code of its status: the generic `invalid_request`, `unauthenticated`, `forbidden`, `not_found`, `validation_failed` and `rate_limited` for theirs, and the last four rows of the table for the others. `conflict` is a concurrent change the server did not handle (retry the request); `internal_error` is a bug, never a domain outcome; `service_unavailable` is a dependency that is down.
+
+The `authorization_pending` row is the device login (`/auth/device/*`, RFC 8628 §3.5): `authorization_pending` (not approved yet), `slow_down` (polled less than `interval` seconds after the previous poll; the interval restarts), `expired_token` (code older than 10 minutes), `access_denied` (denied, or the approver is suspended), `invalid_grant` (unknown device code, or its token was already issued; on approve, a code already decided). An unknown user code on approve is 404 `not_found`.
 
 ## 3. Realtime (Phoenix Channels, `/socket`)
 

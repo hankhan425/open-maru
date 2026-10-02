@@ -20,7 +20,7 @@ ARCHITECTURE > PRD.
 
 ### OQ-1: Envelope code for unhandled errors and transport-level 4xx
 - **Task:** T02
-- **Status:** open
+- **Status:** resolved
 - **Conflict:** SPEC-07 §2 says every error uses the envelope with a stable code, but its table has no
   code for an unhandled server error (HTTP 500) and none for transport-level failures raised before a
   controller runs: 406 (no acceptable format), 413 (body too large), 415 (unsupported media type).
@@ -30,7 +30,17 @@ ARCHITECTURE > PRD.
 - **Chosen (interim):** (a). `Openmaru.Error` knows `internal_error` (500); `OpenmaruWeb.ErrorJSON` maps
   401 → `unauthenticated`, 403 → `forbidden`, 404 → `not_found`, 422 → `validation_failed`,
   429 → `rate_limited`, other 4xx → `invalid_request`, 5xx → `internal_error`, keeping the HTTP status.
-- **Resolution:**
+- **Resolution:** (b) (user, 2026-10-02). The interim choice broke the rule OQ-5 relies on: the
+  code determines the HTTP status (`Openmaru.Error.status/1`), yet a 413 went out as
+  `invalid_request`, which the table maps to 400. Every status the stack raises outside a
+  controller now has a code with that status: `not_acceptable` (406), `request_timeout` (408,
+  Bandit's body read timeout), `conflict` (409, an unhandled `Ecto.StaleEntryError`),
+  `payload_too_large` (413), `uri_too_long` (414, Plug's query-string limit),
+  `unsupported_media_type` (415), `internal_error` (500) and `service_unavailable` (503, the dev
+  repo check). 400, 401, 403, 404, 422 and 429 keep their generic codes. SPEC-07 §2 lists the new
+  codes and states the rule. Tests (T02-T02): a 406 and a 413 through the endpoint, and a guard
+  that every status an exception from Plug, Phoenix, Bandit, Ecto or Postgrex carries renders a
+  code whose status is that status.
 
 ### OQ-2: Money source text in the AST vs. AST equality in L02
 - **Task:** L01
