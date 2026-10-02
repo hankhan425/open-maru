@@ -1,0 +1,42 @@
+// Cedar schema for openmaru policies (SPEC-04 §2). `maru_core::authz::compile` validates
+// every generated policy set against it in strict mode.
+//
+// Entity ids: Person = handle (without `@`), Agent = agent id, Circle = circle id,
+// Goal = goal id. `Person in [Circle]` comes from the effective holders sent with each
+// request; `Goal in [Org]`.
+
+entity Org;
+entity Circle;
+entity Person in [Circle];
+entity Agent;
+entity Goal in [Org];
+
+// Every request sends every field; unused ones are "", 0 or [].
+type RequestContext = {
+  category: String,
+  amount_micros: Long,
+  approved_rules: Set<String>,
+  metric: String,
+  goal: String,
+  now_epoch: Long,
+};
+
+action Spend, ClaimTask, CreateTask, PostEvidence, PostGoalEvidence, ReportMetric,
+       ReviewTask, CancelTask, PauseGoal, ResumeGoal, RequestClose, ManageSecrets
+  appliesTo {
+    principal: [Person, Agent],
+    resource: Goal,
+    context: RequestContext,
+  };
+
+action IssueToken appliesTo {
+  principal: Person,
+  resource: [Agent, Person],
+  context: RequestContext,
+};
+
+action StartSession appliesTo {
+  principal: Person,
+  resource: Agent,
+  context: RequestContext,
+};

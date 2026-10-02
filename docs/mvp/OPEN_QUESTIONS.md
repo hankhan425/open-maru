@@ -305,3 +305,37 @@ ARCHITECTURE > PRD.
      form. It renders literally, so the charter's structure comes only from the templates.
   2. `## Circles` is omitted when the org has none.
   3. Every number in the text is grouped by thousands.
+
+### OQ-13: Policy ids can collide (`self:<handle>` and the rules of a goal named `self`)
+- **Task:** L06
+- **Status:** open
+- **Conflict:** SPEC-04 §2.1 names a person's token policy `self:<handle>` and an approval rule's
+  policy by its rule id, `<goal>:r_<8 hex>` (SPEC-01 §4.6). `self` is not a keyword, and
+  `r_1a2b3c4d` is a valid handle, so a spec with `goal self` and a mandate for `@r_<hash of one of
+  its rules>` checks clean but gives two policies the same id. The hash is known before the
+  mandate is written, so anyone can write such a spec. Cedar needs unique ids. The other
+  prefixes cannot collide: `steward`, `mandate` and `operator` are keywords, and
+  `steward-session` has a `-`, which identifiers cannot contain.
+- **Options:** (a) `compile` returns `CompileError::DuplicatePolicyId`, so the server must
+  refuse such a spec when it compiles a proposal; (b) rename the token policy, e.g.
+  `self:person:<handle>` (two colons, so no rule id can match); (c) prefix rule policies, e.g.
+  `rule:<rule id>`; (d) reserve `self` as a keyword (SPEC-01 §2, a checker change).
+- **Chosen (interim):** (a), keeping the SPEC-04 §2.1 names. Test:
+  `l06_colliding_policy_ids_do_not_compile`.
+- **Resolution:**
+
+### OQ-14: Deny reason when the resource is not in the spec
+- **Task:** L06
+- **Status:** open
+- **Conflict:** SPEC-04 §3 step 4 lists, for `Spend`, "no mandate → `NoMandate`" first, and a
+  principal has no mandate in a goal the spec does not have. L06-T18 expects `Forbidden` for
+  "unknown goal resource". The list also does not say what an action on the wrong kind of
+  resource gets (`Spend` on an agent, `IssueToken` on a goal).
+- **Options:** (a) before step 4's list, a resource that is not a goal of the spec (for the goal
+  actions), not an agent of the spec (`StartSession`, and `IssueToken` on an agent), or of the
+  wrong kind gives `Forbidden`; persons are open-world, so `IssueToken` on any person continues
+  to the list (`NotOperator` unless `self:` allows it); (b) `NoMandate`/`NotSteward`/`NotOperator`
+  for unknown resources too, which contradicts L06-T18.
+- **Chosen (interim):** (a), as L06-T18 expects; SPEC-04 §3 step 4 now says so. Tests: L06-T18,
+  `l06_unknown_resources_and_mismatched_kinds_are_forbidden`.
+- **Resolution:**

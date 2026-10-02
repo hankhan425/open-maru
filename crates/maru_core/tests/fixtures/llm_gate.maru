@@ -1,0 +1,25 @@
+# L06-T17: an approval rule for one category, and a second spend line it does not cover.
+org "LLM Gate" {
+  amend: approve(core, 1)
+
+  circle core {
+    seats: 2
+    holders: @mina, @jo
+  }
+
+  agent builder {
+    operator: @mina
+    runtime: hosted
+  }
+
+  goal editor "Open cloud image editor" {
+    steward: core
+
+    mandate builder {
+      spend llm <= usd 4_000 / month
+      spend compute <= usd 1_000 / month
+    }
+
+    rule spend llm > usd 100 requires approve(core, 1)
+  }
+}

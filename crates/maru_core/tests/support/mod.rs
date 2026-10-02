@@ -2,6 +2,8 @@
 #![allow(dead_code)]
 
 pub mod checking;
+#[cfg(feature = "authz")]
+pub mod decide_cases;
 pub mod ir_strategies;
 pub mod printer;
 pub mod strategies;
