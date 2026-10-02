@@ -13,6 +13,8 @@ defmodule Openmaru.Accounts do
     with `account_exists` (no silent linking). Unverified emails are ignored.
   * **Handles** — picked once, never changed (`set_handle/2`).
   * **Sessions** — opaque 32-byte tokens, stored as SHA-256, 30-day sliding expiry.
+  * **Personal access tokens and device login** — `Openmaru.Accounts.PAT` and
+    `Openmaru.Accounts.Device` (C02).
 
   Sign-in successes and failures go to `Openmaru.Audit`. Functions that audit take a
   `meta` map with the client's `:ip` and `:user_agent`.
@@ -20,7 +22,17 @@ defmodule Openmaru.Accounts do
 
   import Ecto.Query
 
-  alias Openmaru.Accounts.{Challenge, OAuth, OAuthIdentity, Passkey, User, UserSession, WebAuthn}
+  alias Openmaru.Accounts.{
+    Challenge,
+    Device,
+    OAuth,
+    OAuthIdentity,
+    Passkey,
+    User,
+    UserSession,
+    WebAuthn
+  }
+
   alias Openmaru.{Audit, Clock, Error, Repo}
 
   @session_ttl_seconds 30 * 24 * 3600
@@ -643,10 +655,15 @@ defmodule Openmaru.Accounts do
   ## Maintenance
 
   @doc """
-  Deletes challenges past their expiry and sessions that expired or were revoked more
-  than a day ago. Returns the number of rows deleted per table.
+  Deletes challenges past their expiry, sessions that expired or were revoked more than
+  a day ago, and device codes a day past their expiry (`Openmaru.Accounts.Device.prune/0`).
+  Returns the number of rows deleted per table.
   """
-  @spec prune() :: %{challenges: non_neg_integer(), sessions: non_neg_integer()}
+  @spec prune() :: %{
+          challenges: non_neg_integer(),
+          sessions: non_neg_integer(),
+          device_codes: non_neg_integer()
+        }
   def prune do
     now = Clock.now()
     day_ago = DateTime.add(now, -24 * 3600, :second)
@@ -659,7 +676,7 @@ defmodule Openmaru.Accounts do
           where: s.expires_at <= ^now or (not is_nil(s.revoked_at) and s.revoked_at <= ^day_ago)
       )
 
-    %{challenges: challenges, sessions: sessions}
+    %{challenges: challenges, sessions: sessions, device_codes: Device.prune()}
   end
 
   ## Challenges
