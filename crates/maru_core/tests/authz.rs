@@ -405,11 +405,14 @@ fn l06_t22_decide_p95_under_2ms_on_a_2000_line_spec() {
     let mut times = Vec::with_capacity(10_000);
     let mut seen = BTreeMap::<&'static str, usize>::new();
     for i in 0..10_000usize {
-        let g = format!("g{}", (i * 31) % goals);
-        let principal = match i % 3 {
-            0 => agent(&format!("a{}", i % 10)),
-            1 => person(&format!("p{}", i % 20)),
-            _ => person(&format!("p{}", (i * 7) % 20)),
+        // Mostly the goal's own mandate holders and stewards, sometimes anyone.
+        let n = (i * 31) % goals;
+        let g = format!("g{n}");
+        let principal = match i % 4 {
+            0 => agent(&format!("a{}", n % 10)),
+            1 => person(&format!("p{}", (n * 7) % 20)),
+            2 => person(&format!("p{}", 2 * (n % 10))),
+            _ => person(&format!("p{}", i % 20)),
         };
         let action = Action::ALL[i % Action::ALL.len()];
         let resource = match action {
@@ -450,6 +453,26 @@ fn l06_t22_decide_p95_under_2ms_on_a_2000_line_spec() {
 }
 
 // ---- edge cases ----
+
+// L07 caches one compiled policy per spec version and calls `decide` from many
+// processes.
+#[test]
+fn l06_compiled_policy_is_send_and_sync() {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<maru_core::CompiledPolicy>();
+    let policy = std::sync::Arc::new(compile(&fixture_ir("lumen.maru")).unwrap());
+    let handles: Vec<_> = (0..8)
+        .map(|_| {
+            let policy = std::sync::Arc::clone(&policy);
+            std::thread::spawn(move || {
+                cases_for("L06-T09")
+                    .into_iter()
+                    .all(|c| decide(&policy, &c.request) == c.expected)
+            })
+        })
+        .collect();
+    assert!(handles.into_iter().all(|h| h.join().unwrap()));
+}
 
 /// A spec with a byo agent holding only metric capabilities, a hosted agent with
 /// mandates in two goals, a person with mandates in two goals, a rule with neither
