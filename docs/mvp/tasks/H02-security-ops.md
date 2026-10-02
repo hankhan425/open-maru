@@ -17,7 +17,7 @@ Close the gaps a reviewer would find: uniform rate limits, headers, CORS, audit 
 - Admin endpoints: suspend/unsuspend org and user; effects enforced in `authorize`, checkout, and auth.
 - Account deletion flow per SPEC-09 §4.
 - Multi-stage `Dockerfile` (Rust NIFs compiled in build stage), `Openmaru.Release.migrate/0`, container healthcheck.
-- `docs/ops/runbook.md`: deploy, rollback, key rotation (vault, token root key), backup/restore, incident kill switch.
+- `docs/ops/runbook.md`: deploy, rollback, key rotation (vault, token root key, `AUDIT_IP_HASH_KEY`: rotating it makes every earlier audit IP hash unlinkable, SPEC-09 §7), backup/restore with a stated backup retention (it extends the 31-day audit IP window, SPEC-09 §7), incident kill switch.
 - OpenTelemetry spans for API, gateway (attributes: goal_id, mandate_id, model, spend_id), Oban.
 
 ## Tests to write first

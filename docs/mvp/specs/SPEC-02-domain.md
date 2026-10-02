@@ -13,7 +13,8 @@ A principal is `{kind: person|agent|system, id}`. Stored as `(principal_kind, pr
 | `oauth_identities` | `user_id`, `provider` (`github`/`google`), `provider_uid`, unique(`provider`,`provider_uid`) |
 | `user_sessions` | `user_id`, `token_hash unique`, `expires_at`, `revoked_at` |
 | `auth_challenges` | `kind` (`passkey_registration`/`passkey_login`/`oauth`), `challenge bytea null`, `user_id null`, `data jsonb` (user handle or OAuth state/nonce), `expires_at` (5 min), `consumed_at` (single use) |
-| `audit_log` | `action`, `actor_kind`/`actor_id`, `target_type`/`target_id`, `ip_hash` (keyed hash, OQ-6), `ip_hash_key_id`, `user_agent`, `metadata jsonb`, `occurred_at`; append-only (trigger rejects UPDATE/DELETE/TRUNCATE), SPEC-09 §7 |
+| `audit_log` | `action`, `actor_kind`/`actor_id`, `target_type`/`target_id`, `ip_hash` (keyed hash, OQ-6), `ip_hash_key_id` (the `audit_ip_hash_keys` row), `user_agent`, `metadata jsonb`, `occurred_at`; append-only (trigger rejects UPDATE/DELETE/TRUNCATE), SPEC-09 §7 |
+| `audit_ip_hash_keys` | `day date` (UTC day it hashes), `wrapping_key_id` (fingerprint of the `AUDIT_IP_HASH_KEY` that sealed it), `sealed_key bytea null` (null once destroyed), `destroyed_at null`; SPEC-09 §7 |
 | `personal_access_tokens` | `user_id`, `name`, `token_hash unique`, `last4`, `expires_at null`, `revoked_at`, `last_used_at` |
 | `device_codes` | `device_code_hash unique`, `user_code unique` (8 characters, stored without the hyphen), `status` (`pending/approved/denied/expired/consumed`), `user_id null` (who approved or denied), `user_agent null` (the requesting client's; names the token), `expires_at`, `interval_secs`, `last_polled_at null` |
 | `orgs` | `slug citext unique` (`[a-z0-9-]{3,40}`), `name`, `active_version_id`, `status` (`active/suspended`), `created_by` |

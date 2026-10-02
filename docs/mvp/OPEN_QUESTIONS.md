@@ -156,6 +156,18 @@ ARCHITECTURE > PRD.
   would make old hashes unlinkable, if the 30-day intent needs that later. SPEC-09 §7 and
   SPEC-02 §2 are updated. The address hashed is the client's as resolved by trusted-proxy
   handling (SPEC-09 §6), not the load balancer's.
+- **Revised (user, 2026-10-02):** with one long-lived key, every IPv4 hash stayed reversible by the
+  key holder for as long as the key existed, and the append-only table never drops rows, so the
+  30-day intent of SPEC-09 §7 had become "kept forever". Hashed IPs are still personal data while
+  they can be reversed, and data protection law expects such data to have a retention limit.
+  Now each UTC day has its own random key, stored in `audit_ip_hash_keys` sealed under
+  `AUDIT_IP_HASH_KEY`. An hourly job (`Openmaru.Audit.IpKeySweeper`) destroys a key 30 days after
+  its day ends, so an address can be linked to its hashes for at most 31 days. `ip_hash_key_id`
+  is now the id of the day's key row, and `Openmaru.Audit.hashes_for_ip/1` finds an address
+  across the live days. Rotating `AUDIT_IP_HASH_KEY` makes all earlier hashes unlinkable at once.
+  Equal addresses still correlate directly within one day. SPEC-09 §7, SPEC-02 §2 and H02's
+  runbook deliverable are updated. Tests (C01-T18): per-day keys, destruction at the boundary,
+  the sweeper, lookup across days, keys bound to their day, the table constraint, and rotation.
 
 ### OQ-7: A deleted user's handle
 - **Task:** C01 (found while fixing handle rules; H02 implements deletion)
