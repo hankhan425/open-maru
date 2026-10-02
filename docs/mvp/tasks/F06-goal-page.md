@@ -21,7 +21,7 @@ The page supporters and contributors live on: status, money in and out by proven
 - [ ] **F06-T04** Live `ledger` events prepend entries inside a fixed-height region (no layout shift); entries show principal, model/tokens, tier, task link.
 - [ ] **F06-T05** Tasks board columns by status; evidence per task with kind icons; Accept/Reject visible only when `viewer.permissions` includes ReviewTask.
 - [ ] **F06-T06** Activity feed paginates with a cursor.
-- [ ] **F06-T07** Governance section renders the goal's charter section.
+- [ ] **F06-T07** Governance section renders the goal's charter section through `MarkdownInline` (SPEC-08 §4).
 - [ ] **F06-T08** Ledger page filters (category, tier, principal, date range) map to query params; CSV export contains the filtered rows (≤ 10,000) with money as decimal strings.
 - [ ] **F06-T09** Checkpoints page lists checkpoints and shows the `maru ledger verify` command.
 - [ ] **F06-T10** Every money figure links to a filtered ledger URL.

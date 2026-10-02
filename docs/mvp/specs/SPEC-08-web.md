@@ -49,6 +49,7 @@ Provenance badges: **verified** `●` solid ink · **evidenced** `◐` half · *
 - `web/src/lib/maru` wraps the WASM package: `check`, `format`, `render`, `diff`; loaded lazily on the editor route only.
 - Canvas logic (layout, physics, hit-testing, camera) lives in pure TS modules under `features/world/sim/` and is unit-tested without Pixi; the Pixi layer only draws.
 - Money formatting matches the charter helpers exactly (shared test vectors from SPEC-01 §8).
+- Charter strings (the headings, paragraphs and bullets of the structured charter, SPEC-01 §8) are Markdown inline text. They render through one component, `MarkdownInline`, as **CommonMark inline content only**: raw HTML off, no GFM extensions (bare URLs and `www.` are not linked, no strikethrough or tables), no typographic replacements (OQ-12). Use markdown-it's `commonmark` preset with `html: false` and `renderInline`, or an equivalent. SPEC-01 §8 escapes spec text for exactly this renderer, so a name, title or purpose renders literally and cannot add a link, image or HTML. No other API text goes through this component.
 - Routes are code-split; world canvas and editor are separate chunks.
 
 ## 5. Quality bars

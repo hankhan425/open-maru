@@ -327,6 +327,12 @@ ARCHITECTURE > PRD.
      form. It renders literally, so the charter's structure comes only from the templates.
   2. `## Circles` is omitted when the org has none.
   3. Every number in the text is grouped by thousands.
+- **Follow-up (user, 2026-10-02):** the escaping is written for CommonMark, but nothing said
+  which renderer the web uses. A GFM renderer with autolinks (`marked`'s default) would turn a
+  bare `https://…` or `www.…` in a purpose into a link, which §8 says spec text cannot add.
+  SPEC-08 §4 now pins the web's renderer: one `MarkdownInline` component, CommonMark inline content
+  only, raw HTML off, no GFM extensions, no typographer (F01-T15). SPEC-01 §8 names the assumption,
+  and F03, F04, F05 and F06 render charter strings through the component.
 
 ### OQ-13: Policy ids can collide (`self:<handle>` and the rules of a goal named `self`)
 - **Task:** L06
