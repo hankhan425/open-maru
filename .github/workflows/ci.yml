@@ -130,6 +130,9 @@ jobs:
         with:
           version-file: .tool-versions
           version-type: strict
+      # priv/native holds the Rustler NIF (gitignored). Rustler builds it only when it
+      # recompiles Openmaru.Lang.Native, which a restored _build can skip, so cache it with
+      # _build.
       - uses: actions/cache@v4
         if: hashFiles('apps/server/mix.exs') != ''
         with:
@@ -137,6 +140,7 @@ jobs:
             apps/server/deps
             apps/server/_build
             apps/server/priv/plts
+            apps/server/priv/native
             target
           key: mix-${{ runner.os }}-${{ hashFiles('.tool-versions', 'apps/server/mix.lock', 'rust-toolchain.toml', 'Cargo.lock') }}
           restore-keys: mix-${{ runner.os }}-
