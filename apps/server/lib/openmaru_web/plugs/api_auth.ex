@@ -50,6 +50,7 @@ defmodule OpenmaruWeb.Plugs.ApiAuth do
 
   # RFC 6750 §2.1: "Bearer" 1*SP b64token, the scheme case-insensitive.
   @bearer ~r/\Abearer +([A-Za-z0-9\-._~+\/]+=*) *\z/i
+  @pat_prefix "om_pat_"
   @mandate_prefix "om_mt_"
   @mandate_ok :openmaru_mandate_ok
   @resolved :openmaru_api_auth
@@ -80,7 +81,7 @@ defmodule OpenmaruWeb.Plugs.ApiAuth do
     end
   end
 
-  defp load_token(conn, "om_pat_" <> rest = token, _opts) when rest != "" do
+  defp load_token(conn, @pat_prefix <> rest = token, _opts) when rest != "" do
     case PAT.verify(token) do
       {:ok, user, pat} ->
         conn

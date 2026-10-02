@@ -7,7 +7,8 @@ defmodule OpenmaruWeb.SocketToken do
   The token is signed (`Phoenix.Token`, endpoint secret, its own salt) and carries the
   user id and an expiry 5 minutes after signing, both by `Openmaru.Clock`.
   `verify_socket_token/1` refuses anything expired, tampered with, or signed for
-  another purpose with `{:error, :invalid}`.
+  another purpose with `{:error, :invalid}`. It does not read the database: the socket
+  loads the user and refuses a suspended one, as for any credential.
   """
 
   alias Openmaru.Accounts.User
