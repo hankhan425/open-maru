@@ -4,6 +4,8 @@
 
 Auth column: **S** session cookie, **P** personal access token, **M** mandate token, **—** public. Every endpoint is also described in the OpenAPI document (`/api/v1/openapi.json`, generated with `open_api_spex`). Owner = task that implements it.
 
+An `Authorization` header takes precedence over the session cookie: when it is present the cookie is not read, so the request is not cookie-authenticated and needs no `x-csrf-token`. A header that is not one `Bearer <token>`, an unknown token prefix, or a refused token is 401 `invalid_token` on any route, public ones included. A credential a route does not accept is 403 `forbidden`: a PAT on an S route (`details.reason: "session_required"`), a mandate token on a route not marked M (`"mandate_token_not_allowed"`). Routes marked "— / S" (passkey and OAuth sign-in) refuse bearer credentials the same way, so a PAT cannot add a passkey or link an identity.
+
 ### Auth & account
 | Method & path | Auth | Owner |
 |---|---|---|
@@ -13,9 +15,10 @@ Auth column: **S** session cookie, **P** personal access token, **M** mandate to
 | `GET /auth/csrf` → `{csrf_token}` (send as `x-csrf-token` on cookie-authenticated mutations) | S | C01 |
 | `POST /auth/logout` | S | C01 |
 | `GET /me`, `PATCH /me` (handle, display name) | S P | C01 |
-| `POST /auth/device/code`, `POST /auth/device/token` | — | C02 |
-| `POST /auth/device/approve {user_code}` | S | C02 |
-| `GET/POST /me/tokens`, `DELETE /me/tokens/:id` | S | C02 |
+| `POST /auth/device/code` → `{device_code, user_code, verification_uri, verification_uri_complete, expires_in, interval}` · `POST /auth/device/token {device_code}` → new PAT (as `POST /me/tokens`) | — | C02 |
+| `POST /auth/device/approve {user_code, decision?: approve\|deny}` → `{status}` | S | C02 |
+| `GET /me/tokens?cursor=&limit=` · `POST /me/tokens {name, ttl_days?}` → token shown once · `DELETE /me/tokens/:id` | S | C02 |
+| `GET /socket-token` → `{token, expires_in}` (5 minutes, for `/socket`) | S P | C02 |
 | `GET /me/inbox` (open decisions I can vote on, pending holder acceptances, tasks in review for my goals) | S P | C04 |
 
 ### Orgs, specs, decisions
@@ -94,6 +97,9 @@ Choosing between the generic codes: `invalid_request` (400) is a malformed reque
 | `model_not_priced`, `unsupported_feature` | 400 | `provider_credentials_missing` | 424 |
 | `rate_limited` | 429 | `provider_error` | 502 |
 | `gateway_timeout` | 504 | `task_not_in_goal` | 403 |
+| `authorization_pending`, `slow_down`, `expired_token` | 400 | `access_denied`, `invalid_grant` | 400 |
+
+The last row is the device login (`/auth/device/*`, RFC 8628 §3.5): `authorization_pending` (not approved yet), `slow_down` (polled less than `interval` seconds after the previous poll; the interval restarts), `expired_token` (code older than 10 minutes), `access_denied` (denied, or the approver is suspended), `invalid_grant` (unknown device code, or its token was already issued; on approve, a code already decided). An unknown user code on approve is 404 `not_found`.
 
 ## 3. Realtime (Phoenix Channels, `/socket`)
 
