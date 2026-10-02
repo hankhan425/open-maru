@@ -285,7 +285,7 @@ For each goal, `unapproved_monthly_max_micros` is an upper bound on spend possib
 
 Deterministic IR → Markdown. Never uses an LLM. Structure and exact sentences are defined by the golden file `examples/lumen.charter.md` plus these templates. Every default is rendered explicitly.
 
-**Sections in order:** `# <org name>`, purpose paragraph (if any), `## Membership`, `## Changing this charter`, `## Circles`, `## Agents` (omitted if none), then per goal `## Goal: <title>` with purpose paragraph, bullet facts, `### Mandates` (omitted if none), `### Rules` (omitted if none), `### Limits`.
+**Sections in order:** `# <org name>`, purpose paragraph (if any), `## Membership`, `## Changing this charter`, `## Circles` (omitted if none, which needs an org with no goals and `amend: vote(members, …)`), `## Agents` (omitted if none), then per goal `## Goal: <title>` with purpose paragraph, bullet facts, `### Mandates` (omitted if none), `### Rules` (omitted if none), `### Limits`.
 
 **Formatting helpers**
 - Money: `$12,000` for whole dollars; otherwise at least 2 and at most 6 decimals, trailing zeros trimmed past 2: `$12.50`, `$0.000125`.
@@ -293,22 +293,25 @@ Deterministic IR → Markdown. Never uses an LLM. Structure and exact sentences 
 - Dates: `June 30, 2027`.
 - Lists: `a`; `a and b`; `a, b, and c`.
 - Thresholds: `1/2`→`half`, `1/3`→`one-third`, `2/3`→`two-thirds`, `3/4`→`three-quarters`, other fractions `a/b`, percents `60%`.
+- Numbers: counts, vacancies, duration counts and the parts of a fraction threshold are grouped by thousands like metric values: `10,000 seats`, `36,500 days`, `1,000/3,000`.
 
 **Templates**
 - Membership: `Anyone signed in to openmaru can join.` / `New members join when N existing member(s) sponsor(s) them.` (N=1: "member sponsors"; N>1: "members sponsor").
 - Amend — vote: `Changes need a vote of <C>, passing with at least <T> of its holders in favour within <D>.`; vote members: `Changes need a vote of all members, passing with at least <T> of them in favour within <D>.`; approve: `Changes need approval from <N> holder(s) of <C> within <D>.` Then `If the vote does not pass in time, the change is rejected.` (vote/deny), `If not approved in time, the change is rejected.` (approve/deny), `If not decided in time, the change is applied.` (allow).
-- Circle: `- **<id>**: <S> seat(s), each held for <term>.` or `- **<id>**: <S> seat(s) with no term limit.` then ` Holders: <handles or none>.` then vacancy ` 1 seat is vacant.` / ` K seats are vacant.` (omitted when 0).
+- Circle: `- **<id>**: <S> seat(s), each held for <term>.` or `- **<id>**: <S> seat(s) with no term limit.` then ` Holders: <handles joined by ", ", or none>.` then vacancy ` 1 seat is vacant.` / ` K seats are vacant.` (omitted when 0).
 - Agent: `- **<id>** is an AI agent operated by @<op>, running on the hosted runtime.` / `…, running on its operator's own infrastructure.`
 - Goal bullets in order: `Stewarded by <C>.`; funding (see below); closure; success (if any).
 - Funding: `Receives <$X> from the treasury at the start of each <day|week (Monday)|month>.` / `Receives <$X> from the treasury once, when this goal is first adopted.` / `Is funded only by donations.` Followed (only if `fund` present) by ` If the treasury cannot cover it, work on this goal pauses until it is funded.` or ` If the treasury cannot cover it, work continues with the funds available.`
 - Closure: `When closed, its remaining funds return to the treasury.` / `When closed, its remaining funds move to the goal <other title>.`
 - Success: `Success means <metric> reaches <at least|more than|at most|less than|exactly> <value with thousands separators>[ by <date>].`
-- Mandate: `- **<id or @handle>** may spend up to <$X> per <period> on <AI models|compute|expenses>[ and up to …][, at most <$Y> per request].` If no spend lines: `- **<p>** may not spend funds.` Then ` <It|They> may <capability list>.` (omitted if none; phrases: `claim tasks`, `create tasks`, `post evidence`, `report <metric>`). Then ` This mandate expires on <date>.` if set.
+- Mandate: `- **<id or @handle>** may spend up to <$X> per <period> on <AI models|compute|expenses>[ and up to …][, at most <$Y> per request].` Spend clauses are joined with the list helper, in source order (`up to $5 per day on expenses, up to $100 per month on AI models, and up to $20 per week on compute`). If no spend lines: `- **<p>** may not spend funds.` Then ` <It|They> may <capability list>.` (omitted if none; phrases: `claim tasks`, `create tasks`, `post evidence`, `report <metric>`). Then ` This mandate expires on <date>.` if set.
 - Rule subject: `Any spend`, `Any spend over $X`, `Any AI-model spend[ over $X]`, `Any compute spend[ over $X]`, `Any expense[ over $X]`, `Closing this goal`.
 - Rule: `- <subject> needs <approval from N holder(s) of C | a vote of C, passing with at least T of its holders in favour | a vote of all members, passing with at least T of them in favour> within <D>; otherwise <outcome>.` Outcome: spend deny `it is denied`, spend allow `it is allowed`, close deny `it stays open`, close allow `it is closed`.
-- Limits: `Without any approval, at most <$X> per month can be spent on this goal.`; zero with mandates present: `Nothing can be spent on this goal without approval.`; no spend lines at all: `No one may spend from this goal.`
+- Limits: `Without any approval, at most <$X> per month can be spent on this goal.`; zero while some mandate has a spend line: `Nothing can be spent on this goal without approval.`; no spend lines at all: `No one may spend from this goal.`
 
-The renderer also returns a structured form: `[{"section": "…", "paragraphs": ["…"], "bullets": ["…"]}]` for the web UI.
+**Text from the spec** (the org name, goal titles, purposes, ids, handles and metric names) is written on one line and renders literally, so it cannot add a heading, list or link to the charter. Each run of whitespace, line breaks included, becomes one space, and the text is trimmed. A backslash goes before `\`, `` ` ``, `*`, `[`, `]` and `~`; before `_` unless it is between two letters or digits; before `<` followed by a letter, `/`, `!` or `?`; and before `&` that starts an entity (`&amp;`, `&#35;`). It also goes before a block marker at the start of the text (`#`; `>`; `-` before a space, `-` or the end; `+` before a space or the end; the `.` or `)` after 1–9 leading digits, as in `1. `), and before the first `#` of a closing run at the end (`Lumen #`). A purpose that is empty after trimming has no paragraph; an empty heading is a bare `#`.
+
+The renderer also returns a structured form for the web UI: `[{"section": "…", "level": 2, "paragraphs": ["…"], "bullets": ["…"]}]`. `section` is the heading text and `level` its Markdown level (1 for the org, 2 for org-level sections and goals, 3 within a goal). Paragraphs come before bullets, and bullets have no `- ` marker. Every string is Markdown inline text (`**bold**` ids, escaped spec text). The Markdown charter is built from this form: each heading, paragraph and bullet list is one block, blocks are separated by one blank line, and the file ends with one newline.
 
 ## 9. Semantic diff
 

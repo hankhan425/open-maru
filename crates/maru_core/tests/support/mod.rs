@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 pub mod checking;
+pub mod ir_strategies;
 pub mod printer;
 pub mod strategies;
 

@@ -1,0 +1,77 @@
+{
+  "generated_by": "crates/maru_core/tests/human.rs (L04-T19); regenerate with UPDATE_VECTORS=1 cargo test -p maru_core --test human",
+  "money": [
+    {"input":"12000000000","output":"$12,000"},
+    {"input":"12500000","output":"$12.50"},
+    {"input":"125","output":"$0.000125"},
+    {"input":"1000000","output":"$1"},
+    {"input":"1234567890","output":"$1,234.56789"},
+    {"input":"10","output":"$0.00001"},
+    {"input":"999999999999","output":"$999,999.999999"},
+    {"input":"0","output":"$0"},
+    {"input":"1","output":"$0.000001"},
+    {"input":"100000","output":"$0.10"},
+    {"input":"999000","output":"$0.999"},
+    {"input":"1000001","output":"$1.000001"},
+    {"input":"1500000","output":"$1.50"},
+    {"input":"25000000","output":"$25"},
+    {"input":"500000000","output":"$500"},
+    {"input":"1000000000","output":"$1,000"},
+    {"input":"4000000000","output":"$4,000"},
+    {"input":"5000000000","output":"$5,000"},
+    {"input":"1000000000000","output":"$1,000,000"},
+    {"input":"9007199254740991","output":"$9,007,199,254.740991"}
+  ],
+  "number": [
+    {"input":"0","output":"0"},
+    {"input":"999","output":"999"},
+    {"input":"1000","output":"1,000"},
+    {"input":"10000","output":"10,000"},
+    {"input":"-0.5","output":"-0.5"},
+    {"input":"-1500.5","output":"-1,500.5"},
+    {"input":"12.50","output":"12.50"},
+    {"input":"1234567.891","output":"1,234,567.891"},
+    {"input":"0.0001234","output":"0.0001234"},
+    {"input":"-1000000","output":"-1,000,000"},
+    {"input":"123456789012345678901234567890","output":"123,456,789,012,345,678,901,234,567,890"}
+  ],
+  "duration": [
+    {"input":{"value":30,"unit":"m"},"output":"30 minutes"},
+    {"input":{"value":1,"unit":"m"},"output":"1 minute"},
+    {"input":{"value":1,"unit":"h"},"output":"1 hour"},
+    {"input":{"value":48,"unit":"h"},"output":"48 hours"},
+    {"input":{"value":1,"unit":"d"},"output":"1 day"},
+    {"input":{"value":7,"unit":"d"},"output":"7 days"},
+    {"input":{"value":1,"unit":"w"},"output":"1 week"},
+    {"input":{"value":2,"unit":"w"},"output":"2 weeks"},
+    {"input":{"value":1,"unit":"y"},"output":"1 year"},
+    {"input":{"value":2,"unit":"y"},"output":"2 years"},
+    {"input":{"value":36500,"unit":"d"},"output":"36,500 days"}
+  ],
+  "date": [
+    {"input":"2027-06-30","output":"June 30, 2027"},
+    {"input":"2027-01-01","output":"January 1, 2027"},
+    {"input":"2000-02-29","output":"February 29, 2000"},
+    {"input":"2026-03-09","output":"March 9, 2026"},
+    {"input":"2999-12-31","output":"December 31, 2999"}
+  ],
+  "list": [
+    {"input":["a"],"output":"a"},
+    {"input":["a","b"],"output":"a and b"},
+    {"input":["a","b","c"],"output":"a, b, and c"},
+    {"input":["claim tasks","create tasks","post evidence","report m"],"output":"claim tasks, create tasks, post evidence, and report m"}
+  ],
+  "threshold": [
+    {"input":{"num":1,"den":2,"percent":false},"output":"half"},
+    {"input":{"num":1,"den":3,"percent":false},"output":"one-third"},
+    {"input":{"num":2,"den":3,"percent":false},"output":"two-thirds"},
+    {"input":{"num":3,"den":4,"percent":false},"output":"three-quarters"},
+    {"input":{"num":3,"den":5,"percent":false},"output":"3/5"},
+    {"input":{"num":2,"den":4,"percent":false},"output":"2/4"},
+    {"input":{"num":1,"den":1,"percent":false},"output":"1/1"},
+    {"input":{"num":1000,"den":3000,"percent":false},"output":"1,000/3,000"},
+    {"input":{"num":60,"den":100,"percent":true},"output":"60%"},
+    {"input":{"num":100,"den":100,"percent":true},"output":"100%"},
+    {"input":{"num":50,"den":100,"percent":false},"output":"50/100"}
+  ]
+}
