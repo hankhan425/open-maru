@@ -51,5 +51,5 @@ permit(principal == Person::"mina",
        action in [Action::"IssueToken", Action::"StartSession"],
        resource == Agent::"builder");
 
-@id("self:jo")
+@id("self-token:jo")
 permit(principal == Person::"jo", action == Action::"IssueToken", resource == Person::"jo");

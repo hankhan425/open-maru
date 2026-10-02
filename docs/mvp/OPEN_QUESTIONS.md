@@ -308,7 +308,7 @@ ARCHITECTURE > PRD.
 
 ### OQ-13: Policy ids can collide (`self:<handle>` and the rules of a goal named `self`)
 - **Task:** L06
-- **Status:** open
+- **Status:** resolved
 - **Conflict:** SPEC-04 §2.1 names a person's token policy `self:<handle>` and an approval rule's
   policy by its rule id, `<goal>:r_<8 hex>` (SPEC-01 §4.6). `self` is not a keyword, and
   `r_1a2b3c4d` is a valid handle, so a spec with `goal self` and a mandate for `@r_<hash of one of
@@ -322,11 +322,17 @@ ARCHITECTURE > PRD.
   `rule:<rule id>`; (d) reserve `self` as a keyword (SPEC-01 §2, a checker change).
 - **Chosen (interim):** (a), keeping the SPEC-04 §2.1 names. Test:
   `l06_colliding_policy_ids_do_not_compile`.
-- **Resolution:**
+- **Resolution:** (b), with the name `self-token:<handle>` (user, 2026-10-02). Goal ids cannot
+  contain `-`, so no rule id can equal it, and no other prefix starts with `self-token:`; the
+  collision is gone instead of being an error the server has to catch. SPEC-04 §2.1 and the lumen
+  golden (`tests/snapshots/lumen.cedar`) use the new name. `CompileError::DuplicatePolicyId`
+  stays for IRs the checker never emits, such as two goals with one id. Tests:
+  `l06_a_goal_named_self_and_a_rule_like_handle_do_not_collide`,
+  `l06_duplicate_policy_ids_do_not_compile`.
 
 ### OQ-14: Deny reason when the resource is not in the spec
 - **Task:** L06
-- **Status:** open
+- **Status:** resolved
 - **Conflict:** SPEC-04 §3 step 4 lists, for `Spend`, "no mandate → `NoMandate`" first, and a
   principal has no mandate in a goal the spec does not have. L06-T18 expects `Forbidden` for
   "unknown goal resource". The list also does not say what an action on the wrong kind of
@@ -334,8 +340,28 @@ ARCHITECTURE > PRD.
 - **Options:** (a) before step 4's list, a resource that is not a goal of the spec (for the goal
   actions), not an agent of the spec (`StartSession`, and `IssueToken` on an agent), or of the
   wrong kind gives `Forbidden`; persons are open-world, so `IssueToken` on any person continues
-  to the list (`NotOperator` unless `self:` allows it); (b) `NoMandate`/`NotSteward`/`NotOperator`
+  to the list (`NotOperator` unless the person's own token policy allows it); (b) `NoMandate`/`NotSteward`/`NotOperator`
   for unknown resources too, which contradicts L06-T18.
 - **Chosen (interim):** (a), as L06-T18 expects; SPEC-04 §3 step 4 now says so. Tests: L06-T18,
   `l06_unknown_resources_and_mismatched_kinds_are_forbidden`.
+- **Resolution:** (a), the interim choice (user, 2026-10-02). SPEC-04 §3 step 4 states it as a
+  regular rule.
+
+### OQ-15: Two rules in one goal can share a rule id
+- **Task:** L06
+- **Status:** open
+- **Conflict:** SPEC-01 §4.6 makes a rule id `<goal>:r_` plus the first 8 hex characters (32 bits)
+  of the SHA-256 of the canonical rule line, and E314 rejects only two rules with the same
+  subject. Rules with different subjects can still get the same id, and a pair takes a birthday
+  search of about 2^16 lines: `rule spend > usd 14_097 requires approve(core, 1)` and
+  `rule spend > usd 104_588 requires approve(core, 1)` both get `g:r_239bc3bc`, and the spec
+  checks clean. Rule ids are how approvals are tracked (`approved_rules`, `decisions.rule_id`,
+  SPEC-04 §5.2), so approving one rule would count for the other. L06's `compile` refuses the IR
+  (`CompileError::DuplicatePolicyId`), so such a spec cannot be activated, but the failure shows
+  up only when the server compiles it, not in `check` or the editor.
+- **Options:** (a) a checker error for two rules of a goal with the same id (a new code),
+  reported at the second rule; (b) longer ids, e.g. 16 hex characters (64 bits, about 2^32 work
+  for a pair), which changes every rule id, the IR golden and `decide.json`; (c) both; (d) leave
+  it to `compile` (today).
+- **Chosen (interim):** (d). Test: `l06_rules_with_colliding_ids_do_not_compile`.
 - **Resolution:**

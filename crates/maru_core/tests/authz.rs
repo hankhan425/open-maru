@@ -125,7 +125,7 @@ fn l06_t02_policy_ids_are_deterministic_and_follow_the_naming() {
         over_500.as_str(),
         expense.as_str(),
         "operator:builder",
-        "self:jo",
+        "self-token:jo",
     ];
     let first = compile(&ir).unwrap();
     let second = compile(&ir).unwrap();
@@ -560,7 +560,7 @@ fn l06_policies_for_byo_agents_shared_people_and_bare_rules() {
             "mandate:site:agent:builder:caps",
             "operator:scout",
             "operator:builder",
-            "self:sam",
+            "self-token:sam",
         ]
     );
     assert_validates(policy.policy_set());
@@ -637,7 +637,7 @@ fn l06_policies_for_byo_agents_shared_people_and_bare_rules() {
                     .approved(&[&any_spend]),
                 deny(PerRequestExceeded),
             ),
-            // One self policy covers both of @sam's mandates; @mina holds none.
+            // One self-token policy covers both of @sam's mandates; @mina holds none.
             (
                 req(person("sam"), Action::IssueToken, person_resource("sam")),
                 allow(),
@@ -950,22 +950,76 @@ fn l06_compile_rejects_irs_the_checker_never_emits() {
     assert!(compile(&ir).is_ok());
 }
 
-// See OQ-13.
+// OQ-13: token policies are `self-token:<handle>`, which no rule id (`<goal>:r_<hex>`,
+// goal ids have no `-`) can equal.
 #[test]
-fn l06_colliding_policy_ids_do_not_compile() {
-    // A goal `self` has rules `self:r_<hex>`; a person whose handle is `r_<hex>` has the
-    // policy `self:r_<hex>`.
+fn l06_a_goal_named_self_and_a_rule_like_handle_do_not_collide() {
+    // Goal `self` has the rule policy `self:r_<hex>`; the person whose handle is `r_<hex>`
+    // has the token policy `self-token:r_<hex>`.
     let rule = "rule spend requires approve(core, 1)";
-    let colliding = rule_id("self", rule);
-    let handle = colliding.strip_prefix("self:").unwrap();
+    let rule_policy = rule_id("self", rule);
+    let handle = rule_policy.strip_prefix("self:").unwrap();
     let src = format!(
-        "org \"T\" {{\n  amend: approve(core, 1)\n\n  circle core {{\n    seats: 1\n    holders: @mina\n  }}\n\n  goal self \"S\" {{\n    steward: core\n\n    mandate @{handle} {{\n      can: claim_tasks\n    }}\n\n    {rule}\n  }}\n}}\n"
+        "org \"T\" {{\n  amend: approve(core, 1)\n\n  circle core {{\n    seats: 1\n    holders: @mina\n  }}\n\n  goal self \"S\" {{\n    steward: core\n\n    mandate @{handle} {{\n      spend expense <= usd 10 / month\n      can: claim_tasks\n    }}\n\n    {rule}\n  }}\n}}\n"
     );
     let ir = ir_ok(&src);
-    assert_eq!(ir.org.goals[0].rules[0].id, colliding);
+    assert_eq!(ir.org.goals[0].rules[0].id, rule_policy);
+    let token_policy = format!("self-token:{handle}");
+    let policy = compile(&ir).unwrap();
+    let ids = policy.policy_ids();
+    assert!(ids.contains(&rule_policy.as_str()), "{ids:?}");
+    assert!(ids.contains(&token_policy.as_str()), "{ids:?}");
+    assert_validates(policy.policy_set());
+    assert_decisions(
+        &ir,
+        vec![
+            (
+                req(person(handle), Action::IssueToken, person_resource(handle)),
+                allow(),
+            ),
+            (
+                req(person(handle), Action::Spend, goal("self")).category("expense", 1),
+                requires(&[&rule_policy]),
+            ),
+            (
+                req(person(handle), Action::ClaimTask, goal("self")),
+                allow(),
+            ),
+        ],
+    );
+}
+
+// Duplicate policy ids do not compile.
+#[test]
+fn l06_duplicate_policy_ids_do_not_compile() {
+    let mut ir = fixture_ir("lumen.maru");
+    let goal = ir.org.goals[0].clone();
+    ir.org.goals.push(goal);
     assert_eq!(
         compile(&ir).err(),
-        Some(CompileError::DuplicatePolicyId(colliding))
+        Some(CompileError::DuplicatePolicyId(
+            "steward:editor".to_string()
+        ))
+    );
+}
+
+// OQ-15: rule ids keep 32 bits of the hash, so two rules of one goal with different
+// subjects can share an id. The checker accepts such a spec; compile refuses it.
+#[test]
+fn l06_rules_with_colliding_ids_do_not_compile() {
+    let rules = [
+        "rule spend > usd 14_097 requires approve(core, 1)",
+        "rule spend > usd 104_588 requires approve(core, 1)",
+    ];
+    assert_eq!(rule_id("g", rules[0]), rule_id("g", rules[1]));
+    let src = format!(
+        "org \"T\" {{\n  amend: approve(core, 1)\n\n  circle core {{\n    seats: 1\n    holders: @mina\n  }}\n\n  goal g \"G\" {{\n    steward: core\n\n    {}\n    {}\n  }}\n}}\n",
+        rules[0], rules[1]
+    );
+    let ir = ir_ok(&src);
+    assert_eq!(
+        compile(&ir).err(),
+        Some(CompileError::DuplicatePolicyId(rule_id("g", rules[0])))
     );
 }
 

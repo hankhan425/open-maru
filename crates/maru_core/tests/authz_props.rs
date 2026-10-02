@@ -322,7 +322,7 @@ impl Renamed {
             over_500.clone(),
             expense.clone(),
             format!("operator:{agent}"),
-            format!("self:{jo}"),
+            format!("self-token:{jo}"),
         ]
     }
 }

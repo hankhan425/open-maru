@@ -18,7 +18,7 @@ The schema is `crates/maru_core/schema/openmaru.cedarschema`; `compile` validate
 **Context record:** `{ category: String, amount_micros: Long, approved_rules: Set<String>, metric: String, goal: String, now_epoch: Long }` (unused fields are sent as `""`/`0`/`[]`).
 
 ### 2.1 Generated policies (one IR → one policy set)
-Policy IDs are deterministic; the snapshot test pins the full output for `lumen.maru` (`crates/maru_core/tests/snapshots/lumen.cedar`). Order: for each goal, its steward policy, its `steward-session` policies, then per mandate its `caps`, `metrics` and `spend:<cat>` policies (each only when the mandate has such lines), then its spend rules; after all goals, one `operator:` policy per agent and one `self:` policy per person holding a mandate, in order of first appearance. Every string from the IR is written with Cedar's string escaping, and `compile` rejects an IR whose ids, handles, metric names, rule ids, dates or amounts the language would not allow. Two policies with the same id do not compile (`CompileError::DuplicatePolicyId`): a goal named `self` and a person whose handle is one of its rule ids' `r_…` part collide (OQ-13).
+Policy IDs are deterministic; the snapshot test pins the full output for `lumen.maru` (`crates/maru_core/tests/snapshots/lumen.cedar`). Order: for each goal, its steward policy, its `steward-session` policies, then per mandate its `caps`, `metrics` and `spend:<cat>` policies (each only when the mandate has such lines), then its spend rules; after all goals, one `operator:` policy per agent and one `self-token:` policy per person holding a mandate, in order of first appearance. Every string from the IR is written with Cedar's string escaping, and `compile` rejects an IR whose ids, handles, metric names, rule ids, dates or amounts the language would not allow. Policies of different kinds cannot share an id: rule ids are `<goal>:r_<hex>` with no `-` in the goal id, and every other id starts with a keyword or a hyphenated prefix (OQ-13). An IR that still yields two equal ids does not compile (`CompileError::DuplicatePolicyId`): two goals with one id, or two rules of a goal whose 8-hex hashes collide (OQ-15).
 
 Steward powers, per goal:
 ```cedar
@@ -62,13 +62,13 @@ Tokens and sessions:
 ```cedar
 @id("operator:builder")
 permit(principal == Person::"mina", action in [Action::"IssueToken", Action::"StartSession"], resource == Agent::"builder");
-@id("self:jo")
+@id("self-token:jo")
 permit(principal == Person::"jo", action == Action::"IssueToken", resource == Person::"jo");
 @id("steward-session:editor:builder")
 permit(principal in Circle::"core", action == Action::"StartSession", resource == Agent::"builder")
 when { context.goal == "editor" };
 ```
-(`self:` policies exist for every person holding a mandate; `steward-session` for every hosted agent with a mandate in a goal. `operator:` policies exist for every agent, `byo` included; starting a session for a `byo` agent is refused later with `agent_not_hosted`, SPEC-06 §4.)
+(`self-token:` policies exist for every person holding a mandate; `steward-session` for every hosted agent with a mandate in a goal. `operator:` policies exist for every agent, `byo` included; starting a session for a `byo` agent is refused later with `agent_not_hosted`, SPEC-06 §4.)
 
 ## 3. `decide` algorithm (Rust, `maru_core::authz`)
 

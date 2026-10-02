@@ -34,7 +34,8 @@ pub enum CompileError {
         /// The value.
         value: String,
     },
-    /// Two generated policies would have the same id (OQ-13).
+    /// Two generated policies would have the same id. Only an IR the checker never
+    /// emits (such as two goals with one id) has them; see OQ-13.
     #[error("two policies would have the id `{0}`")]
     DuplicatePolicyId(String),
     /// A generated policy does not parse (a bug).
@@ -109,7 +110,7 @@ static SCHEMA: LazyLock<Result<Schema, String>> = LazyLock::new(|| {
 /// # Errors
 ///
 /// [`CompileError`] when the IR holds values the language does not allow, or two policies
-/// would share an id (OQ-13).
+/// would share an id.
 pub fn compile(ir: &Ir) -> Result<CompiledPolicy, CompileError> {
     if ir.ir_version != IR_VERSION {
         return Err(CompileError::UnsupportedIrVersion(ir.ir_version));
@@ -403,7 +404,7 @@ fn expiry_guard(mandate: &Mandate) -> Option<String> {
 
 /// Every policy for `ir`, in text order: per goal its steward powers, steward sessions,
 /// mandates (capabilities, metrics, spend lines) and approval rules; then one operator
-/// policy per agent and one `self` policy per person holding a mandate.
+/// policy per agent and one `self-token` policy per person holding a mandate.
 fn generate(ir: &Ir) -> Vec<Generated> {
     let mut out = Vec::new();
     let hosted: HashSet<&str> = ir
@@ -462,7 +463,7 @@ fn generate(ir: &Ir) -> Vec<Generated> {
     }
     for person in people {
         out.push(Generated::permit(
-            format!("self:{person}"),
+            format!("self-token:{person}"),
             PrincipalScope::Is(EntityType::Person, person.to_string()),
             vec![Action::IssueToken],
             (ResourceKind::Person, person.to_string()),
