@@ -73,6 +73,7 @@ codes! {
     E322: "`approve(members, …)` is not allowed.",
     E323: "Duplicate holder in a circle.",
     E324: "`seats` or `sponsors` is 0.",
+    E325: "Two rules in a goal have the same rule id.",
     W401: "Mandate `expires` is in the past.",
     W402: "`else allow` on a rule or `amend`.",
     W403: "A mandate's spend limit exceeds the goal's `fund` for the same period.",

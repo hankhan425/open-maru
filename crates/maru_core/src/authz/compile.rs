@@ -35,7 +35,7 @@ pub enum CompileError {
         value: String,
     },
     /// Two generated policies would have the same id. Only an IR the checker never
-    /// emits (such as two goals with one id) has them; see OQ-13.
+    /// emits (such as two goals with one id) has them; see OQ-13 and OQ-15.
     #[error("two policies would have the id `{0}`")]
     DuplicatePolicyId(String),
     /// A generated policy does not parse (a bug).

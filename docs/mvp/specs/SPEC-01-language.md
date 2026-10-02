@@ -125,7 +125,7 @@ Parsing is error-tolerant: on a syntax error inside a block, the parser skips to
 - `rule spend [category] [> money] requires P [timeout]`: any spend matching the category (or any category if omitted) and strictly over the amount (or any amount if omitted) must be approved by decision P before it executes.
 - `rule close requires P [timeout]`: closing the goal requires decision P. Without such a rule, closing requires `approve(<steward>, 1)`.
 - Default timeout: `within 7d else deny`.
-- Rule identity: `"<goal_id>:r_" + first 8 hex chars of SHA-256(canonical rule text)` (canonical text = the formatted `rule …` line without indentation or comments; `maru_core::fmt::rule_line`). Two rules with the same subject in one goal → E314.
+- Rule identity: `"<goal_id>:r_" + first 8 hex chars of SHA-256(canonical rule text)` (canonical text = the formatted `rule …` line without indentation or comments; `maru_core::fmt::rule_line`). Two rules with the same subject in one goal → E314. Two rules of one goal whose ids are equal (different rule lines whose hashes start with the same 8 hex characters) → E325, so within a goal every rule has its own id and an approval of one rule never counts for another (OQ-15).
 
 ### 4.7 Decision procedures
 - `approve(C, N)`: passes when N distinct effective holders of circle C approve. Fails early when rejections make N approvals impossible. `members` not allowed (E322). 1 ≤ N ≤ seats(C) (E307).
@@ -145,12 +145,12 @@ The checker is pure: `check(source, opts) → {diagnostics, ir?}`. IR is returne
 Checking has two stages. The parser reports E1xx, E2xx, E310 and E311. If it reports any error, `check` returns those diagnostics alone: no semantic checks run and there is no IR. The parser leaves an item with an error out of the tree, so checking that tree would report the same mistake again (a malformed `seats` would also be a missing one, E304). The first stage also formats the tree for the spec hash; when the formatted source would exceed 256 KiB, `check` returns that E109 alone. Semantic checks (the other E3xx codes and all W4xx) run only on a source that parses without errors.
 
 Within the semantic stage, one mistake gives one diagnostic:
-- A repeat is reported at its second occurrence, with a note giving the first one's position (e.g. `first declared at line 7, column 10`): E301, E305, E312, E313, E314, E323, W408. The repeat is then ignored (a second `fund` is not compared with spend limits; a repeated `can` adds nothing).
+- A repeat is reported at its second occurrence, with a note giving the first one's position (e.g. `first declared at line 7, column 10`): E301, E305, E312, E313, E314, E323, E325, W408. The repeat is then ignored (a second `fund` is not compared with spend limits; a repeated `can` adds nothing).
 - E305 covers every field that may appear once: `purpose`, `members` and `amend` in the org; `seats`, `term` and `holders`; `operator` and `runtime`; `steward`, `purpose`, `fund`, `on_underfunded`, `on_close` and `success` in a goal; `per_request`, `can` and `expires` in a mandate. Repeated `spend` lines are E313 (per category).
-- A value that is already an error is not checked again for its consequences: no E306 for a circle whose `seats` is missing or 0; no E307 above the seats of such a circle; no E316 where E307 or E302 applies; no W403 for a zero `fund` or spend limit; an unknown steward is E302, not also E317.
+- A value that is already an error is not checked again for its consequences: no E306 for a circle whose `seats` is missing or 0; no E307 above the seats of such a circle; no E316 where E307 or E302 applies; no W403 for a zero `fund` or spend limit; an unknown steward is E302, not also E317; a rule that repeats a subject is E314, not also E325.
 - Circles, agents and goals have separate id spaces (a circle and a goal may both be `core`). A reference to a repeated id resolves to its first declaration.
 
-Spans: E301, E302, E303, E312, E315 and E317 point at the identifier or handle; E304 at the block's identifier (the org's name for `amend`); E305, E306, E313, W403, W404 and W405 at the whole item; E307 at the count; E308 at the threshold; E309 at the amount (`usd …`); E314 at the second rule's subject; E316 at the procedure; E318 at the goal's id; E319 at the duration; E322 at `members`; E324 at the number; W401 at the date; W402 at `within … else allow`; W406 at the agent's id; W408 at the repeated capability. Diagnostics are sorted by span start; ties keep the order in which they were found.
+Spans: E301, E302, E303, E312, E315 and E317 point at the identifier or handle; E304 at the block's identifier (the org's name for `amend`); E305, E306, E313, E325, W403, W404 and W405 at the whole item; E307 at the count; E308 at the threshold; E309 at the amount (`usd …`); E314 at the second rule's subject; E316 at the procedure; E318 at the goal's id; E319 at the duration; E322 at `members`; E324 at the number; W401 at the date; W402 at `within … else allow`; W406 at the agent's id; W408 at the repeated capability. Diagnostics are sorted by span start; ties keep the order in which they were found.
 
 | Code | Severity | Condition |
 |---|---|---|
@@ -188,6 +188,7 @@ Spans: E301, E302, E303, E312, E315 and E317 point at the identifier or handle; 
 | E322 | error | `approve(members, …)` is not allowed |
 | E323 | error | Duplicate holder in a circle |
 | E324 | error | `seats` or `invite(sponsors: …)` is 0 |
+| E325 | error | Two rules in a goal have the same rule id (§4.6) |
 | W401 | warning | Mandate `expires` is in the past: `opts.now` is at or after `DATE`T00:00:00Z (only with `opts.now`) |
 | W402 | warning | `else allow` on a rule or `amend` |
 | W403 | warning | A mandate's spend limit for a category exceeds the goal's `fund` normalized to the same period (both converted to a month with the §6.1 factors: `usd 50 / day` is 1,550 a month; a `once` fund never warns) |

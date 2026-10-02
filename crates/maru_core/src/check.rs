@@ -613,12 +613,15 @@ impl<'a> Checker<'a> {
         let mut principals: HashMap<(ir::PrincipalKind, &str), Span> = HashMap::new();
         let mut rules = Vec::new();
         let mut subjects: HashMap<SubjectKey, Span> = HashMap::new();
+        let mut rule_ids: HashMap<String, Span> = HashMap::new();
         for item in &g.body.items {
             match &item.node {
                 ast::GoalItem::Mandate(m) => {
                     mandates.push(self.mandate(g, m, fund_monthly, &mut principals));
                 }
-                ast::GoalItem::Rule(r) => rules.push(self.rule(g, r, &mut subjects)),
+                ast::GoalItem::Rule(r) => {
+                    rules.push(self.rule(g, r, item.span, &mut subjects, &mut rule_ids));
+                }
                 _ => {}
             }
         }
@@ -857,11 +860,14 @@ impl<'a> Checker<'a> {
 
     // ---- rules and procedures ----
 
+    /// Checks a rule (E314, E325 and its parts) and lowers it; `span` is the whole item.
     fn rule(
         &mut self,
         g: &ast::Goal,
         r: &ast::Rule,
+        span: Span,
         subjects: &mut HashMap<SubjectKey, Span>,
+        rule_ids: &mut HashMap<String, Span>,
     ) -> ir::Rule {
         let (key, subject) = match &r.subject.kind {
             ast::SubjectKind::Close => (SubjectKey::Close, ir::Subject::Close),
@@ -878,6 +884,9 @@ impl<'a> Checker<'a> {
                 )
             }
         };
+        let mut hash = sha256_hex(&rule_line(r));
+        hash.truncate(8);
+        let id = format!("{}:r_{hash}", g.id.name);
         match subjects.get(&key) {
             Some(first) => {
                 let message = format!("goal `{}` already has a rule with this subject", g.id.name);
@@ -887,14 +896,30 @@ impl<'a> Checker<'a> {
             }
             None => {
                 subjects.insert(key, r.subject.span);
+                // Ids keep 32 bits of the hash, so different rules can share one (OQ-15).
+                match rule_ids.get(&id) {
+                    Some(first) => {
+                        let message = format!(
+                            "this rule's id `{id}` is the id of another rule in goal `{}`",
+                            g.id.name
+                        );
+                        let d = Diagnostic::new(Code::E325, message, span)
+                            .with_note(at("first rule", *first))
+                            .with_note(
+                                "a rule's id is a hash of its formatted line; changing either rule gives it a new id",
+                            );
+                        self.report(d);
+                    }
+                    None => {
+                        rule_ids.insert(id.clone(), span);
+                    }
+                }
             }
         }
         let procedure = self.procedure(&r.procedure);
         let (within, otherwise) = self.timeout(r.timeout.as_ref(), "lets the request through");
-        let mut hash = sha256_hex(&rule_line(r));
-        hash.truncate(8);
         ir::Rule {
-            id: format!("{}:r_{hash}", g.id.name),
+            id,
             subject,
             procedure,
             within,

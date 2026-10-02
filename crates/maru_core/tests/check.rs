@@ -874,6 +874,40 @@ fn l03_t32_monthly_limit_over_the_money_maximum_is_e318() {
     assert_eq!(MAX_MONEY_MICROS, 9_007_199_254_740_991);
 }
 
+// L03-T33
+#[test]
+fn l03_t33_rules_with_one_id_in_a_goal_is_e325() {
+    // Different subjects whose hashes share the first 8 hex characters (OQ-15).
+    let first = "rule spend > usd 14_097 requires approve(core, 1)";
+    let second = "rule spend > usd 104_588 requires approve(core, 1)";
+    assert_eq!(rule_id("g", first), "g:r_239bc3bc");
+    assert_eq!(rule_id("g", second), "g:r_239bc3bc");
+
+    let src = in_goal(&format!("    {first}\n    {second}"));
+    let d = only(&src, Code::E325);
+    assert_eq!(text(&src, &d), second);
+    assert_points_to_first(&src, &d, first);
+    assert!(d.message.contains("`g:r_239bc3bc`"), "{}", d.message);
+
+    // Ids start with the goal id, so the rules can sit in different goals.
+    let apart = spec(
+        &format!("  goal h \"H\" {{\n    steward: core\n\n    {second}\n  }}\n"),
+        &format!("    {first}"),
+    );
+    let ir = ir_ok(&apart);
+    let ids: Vec<&str> = ir
+        .org
+        .goals
+        .iter()
+        .flat_map(|g| g.rules.iter().map(|r| r.id.as_str()))
+        .collect();
+    assert_eq!(ids, ["h:r_239bc3bc", "g:r_239bc3bc"]);
+
+    // Two identical rules repeat a subject: E314 alone.
+    let identical = in_goal(&format!("    {first}\n    {first}"));
+    only(&identical, Code::E314);
+}
+
 // ---- additional edge cases ----
 
 // L03 extra: suggestions for unknown agents and goals, and `members` for a vote.
