@@ -1,6 +1,7 @@
 # Defined at compile time so modules configured to call them compile without warnings.
 Mox.defmock(Openmaru.ClockMock, for: Openmaru.Clock)
 Mox.defmock(Openmaru.HealthMock, for: Openmaru.Health)
+Mox.defmock(Openmaru.Mandates.TokenVerifierMock, for: Openmaru.Mandates.TokenVerifier)
 
 defmodule Openmaru.Mocks do
   @moduledoc """
@@ -15,6 +16,12 @@ defmodule Openmaru.Mocks do
   def stub_defaults do
     Mox.stub_with(Openmaru.ClockMock, Openmaru.Clock.System)
     Mox.stub_with(Openmaru.HealthMock, Openmaru.Health.Postgres)
+
+    Mox.stub_with(
+      Openmaru.Mandates.TokenVerifierMock,
+      Openmaru.Mandates.TokenVerifier.Unimplemented
+    )
+
     :ok
   end
 end
