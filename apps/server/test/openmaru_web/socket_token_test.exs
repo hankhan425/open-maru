@@ -43,7 +43,10 @@ defmodule OpenmaruWeb.SocketTokenTest do
 
     for position <- [0, div(byte_size(token), 2), byte_size(token) - 1] do
       <<head::binary-size(^position), char, tail::binary>> = token
-      replacement = if char == ?A, do: ?B, else: ?A
+      # The last character of an unpadded base64url segment has unused low bits (A and B
+      # can decode alike), so change its top two bits, which always carry data: A–P are
+      # 0b00xxxx, `w` is 0b110000.
+      replacement = if char in ?A..?P, do: ?w, else: ?A
       tampered = head <> <<replacement>> <> tail
 
       assert SocketToken.verify_socket_token(tampered) == {:error, :invalid}
