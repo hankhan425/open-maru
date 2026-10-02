@@ -273,6 +273,17 @@ pub enum Category {
     Expense,
 }
 
+impl Category {
+    /// The keyword, as in the IR JSON (`"llm"`, `"compute"`, `"expense"`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Category::Llm => "llm",
+            Category::Compute => "compute",
+            Category::Expense => "expense",
+        }
+    }
+}
+
 /// A UTC calendar period.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
