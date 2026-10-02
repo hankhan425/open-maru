@@ -8,10 +8,11 @@ publish.workspace = true
 
 [features]
 default = ["authz"]
-# Reserved for the Cedar compiler and `decide` (L06). Off for WASM builds.
-authz = []
+# The Cedar compiler and `decide` (L06). Off for WASM builds.
+authz = ["dep:cedar-policy"]
 
 [dependencies]
+cedar-policy = { workspace = true, optional = true }
 chrono.workspace = true
 serde.workspace = true
 serde_json.workspace = true

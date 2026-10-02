@@ -1,12 +1,14 @@
 //! maru language core. One implementation compiled to three targets: the Rustler NIF
 //! (`maru_nif`), WASM (`maru_wasm`), and the `maru` CLI (`maru_cli`).
 //!
-//! Feature `authz` (default) is reserved for the Cedar compiler and `decide`; the WASM
+//! Feature `authz` (default) adds the Cedar compiler and `decide` ([`authz`]); the WASM
 //! build disables it.
 #![forbid(unsafe_code)]
 #![warn(missing_docs)]
 
 pub mod ast;
+#[cfg(feature = "authz")]
+pub mod authz;
 pub mod charter;
 pub mod check;
 pub mod diag;
@@ -20,6 +22,11 @@ pub mod parser;
 pub mod span;
 pub mod suggest;
 
+#[cfg(feature = "authz")]
+pub use authz::{
+    CompileError, CompiledPolicy, Decision, DecisionRequest, DenyReason, cedar_text, compile,
+    decide,
+};
 pub use charter::{Section, render_markdown, render_sections};
 pub use check::{CheckOptions, CheckOutput, check};
 pub use diag::{Code, Diagnostic, Severity};

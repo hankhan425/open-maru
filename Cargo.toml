@@ -21,6 +21,9 @@ assert_cmd = "2"
 proptest = "1"
 insta = { version = "1", features = ["json"] }
 jsonschema = { version = "0.58", default-features = false }
+# Cedar policies for `maru_core::authz` (ADR-5). 4.7 is the newest line whose MSRV fits rust-version 1.85;
+# no extensions (ipaddr/decimal/datetime) are used.
+cedar-policy = { version = "4.7", default-features = false }
 
 [workspace.lints.clippy]
 unwrap_used = "deny"

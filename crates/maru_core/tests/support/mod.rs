@@ -2,6 +2,8 @@
 #![allow(dead_code)]
 
 pub mod checking;
+#[cfg(feature = "authz")]
+pub mod decide_cases;
 pub mod ir_strategies;
 pub mod printer;
 pub mod strategies;
@@ -25,11 +27,27 @@ pub fn strip_spans(v: &mut Value) {
     }
 }
 
-/// The AST as JSON with spans removed, for comparisons that ignore positions.
+/// `v` with object keys sorted (by bytes), recursively. `serde_json` keeps insertion
+/// order when its `preserve_order` feature is on, and `cedar-policy` (feature `authz`)
+/// turns it on, so snapshots of a [`Value`] sort explicitly.
+pub fn sorted(v: Value) -> Value {
+    match v {
+        Value::Object(map) => {
+            let mut entries: Vec<(String, Value)> = map.into_iter().collect();
+            entries.sort_by(|a, b| a.0.cmp(&b.0));
+            Value::Object(entries.into_iter().map(|(k, v)| (k, sorted(v))).collect())
+        }
+        Value::Array(items) => Value::Array(items.into_iter().map(sorted).collect()),
+        other => other,
+    }
+}
+
+/// The AST as JSON with spans removed and keys sorted, for comparisons that ignore
+/// positions.
 pub fn ast_json(file: &File) -> Value {
     let mut v = serde_json::to_value(file).expect("AST serializes");
     strip_spans(&mut v);
-    v
+    sorted(v)
 }
 
 /// The fields of [`File`], [`Item`] and [`Block`] that hold comments.
