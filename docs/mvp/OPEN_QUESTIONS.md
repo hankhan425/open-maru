@@ -349,7 +349,7 @@ ARCHITECTURE > PRD.
 
 ### OQ-15: Two rules in one goal can share a rule id
 - **Task:** L06
-- **Status:** open
+- **Status:** resolved
 - **Conflict:** SPEC-01 §4.6 makes a rule id `<goal>:r_` plus the first 8 hex characters (32 bits)
   of the SHA-256 of the canonical rule line, and E314 rejects only two rules with the same
   subject. Rules with different subjects can still get the same id, and a pair takes a birthday
@@ -364,4 +364,12 @@ ARCHITECTURE > PRD.
   for a pair), which changes every rule id, the IR golden and `decide.json`; (c) both; (d) leave
   it to `compile` (today).
 - **Chosen (interim):** (d). Test: `l06_rules_with_colliding_ids_do_not_compile`.
-- **Resolution:**
+- **Resolution:** (a) (user, 2026-10-02). The checker reports a new error, E325, at the second
+  of two rules of a goal with the same id (span on the whole rule, a note on the first). A rule
+  that already repeats a subject (E314) is not also E325. Ids keep their length, so every rule id,
+  the IR golden and `decide.json` stay the same. A spec that collides is now rejected by `check`
+  and the editor, and within a goal an approval names exactly one rule. SPEC-01 §4.6 and §5 and
+  SPEC-04 §2.1 state it. `compile` still refuses an IR with equal ids
+  (`CompileError::DuplicatePolicyId`), which the checker no longer emits. Tests: L03-T33
+  (`l03_t33_rules_with_one_id_in_a_goal_is_e325`), `l06_rules_with_colliding_ids_do_not_compile`
+  (now on an IR edited after checking).

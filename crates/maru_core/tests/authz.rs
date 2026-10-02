@@ -18,9 +18,9 @@ use maru_core::authz::{
     Action, CEDAR_SCHEMA, CompileError, Decision, DecisionRequest, DenyReason, cedar_text, compile,
     decide,
 };
-use maru_core::{CheckOptions, Ir, check};
+use maru_core::{CheckOptions, Code, Ir, check};
 use serde_json::{Value, json};
-use support::checking::{ir_ok, is_rule_id, rule_id};
+use support::checking::{ir_ok, is_rule_id, only, rule_id};
 use support::decide_cases::*;
 
 const GOLDEN_CEDAR: &str = include_str!("snapshots/lumen.cedar");
@@ -1004,22 +1004,26 @@ fn l06_duplicate_policy_ids_do_not_compile() {
 }
 
 // OQ-15: rule ids keep 32 bits of the hash, so two rules of one goal with different
-// subjects can share an id. The checker accepts such a spec; compile refuses it.
+// subjects can share an id. The checker rejects such a spec (E325); compile still refuses
+// an IR edited to have one.
 #[test]
 fn l06_rules_with_colliding_ids_do_not_compile() {
-    let rules = [
-        "rule spend > usd 14_097 requires approve(core, 1)",
-        "rule spend > usd 104_588 requires approve(core, 1)",
-    ];
-    assert_eq!(rule_id("g", rules[0]), rule_id("g", rules[1]));
-    let src = format!(
-        "org \"T\" {{\n  amend: approve(core, 1)\n\n  circle core {{\n    seats: 1\n    holders: @mina\n  }}\n\n  goal g \"G\" {{\n    steward: core\n\n    {}\n    {}\n  }}\n}}\n",
-        rules[0], rules[1]
+    let src = |second: &str| {
+        format!(
+            "org \"T\" {{\n  amend: approve(core, 1)\n\n  circle core {{\n    seats: 1\n    holders: @mina\n  }}\n\n  goal g \"G\" {{\n    steward: core\n\n    rule spend > usd 14_097 requires approve(core, 1)\n    {second}\n  }}\n}}\n"
+        )
+    };
+    only(
+        &src("rule spend > usd 104_588 requires approve(core, 1)"),
+        Code::E325,
     );
-    let ir = ir_ok(&src);
+    let mut ir = ir_ok(&src("rule spend > usd 104_589 requires approve(core, 1)"));
+    let id = ir.org.goals[0].rules[0].id.clone();
+    assert_eq!(id, "g:r_239bc3bc");
+    ir.org.goals[0].rules[1].id = id.clone();
     assert_eq!(
         compile(&ir).err(),
-        Some(CompileError::DuplicatePolicyId(rule_id("g", rules[0])))
+        Some(CompileError::DuplicatePolicyId(id))
     );
 }
 

@@ -52,6 +52,7 @@ Validate a parsed spec and produce the normalized IR (defaults materialized, rul
 - [ ] **L03-T30** Property: generated sources never panic the checker; result is IR xor ≥ 1 error.
 - [ ] **L03-T31** Parse errors stop semantic checks: `seats: 3x` gives only E103 (no E304); a steward circle with `holders: @A` gives only E106 (no E317); `fund: usd 9_007_199_255 / month from treasury` with `on_underfunded: pause` gives only E310 (no W404).
 - [ ] **L03-T32** E318: one mandate with `spend llm <= usd 300_000_000 / day` (×31 = $9.3 billion) errors on the goal; `usd 290_000_000 / day` does not; the same line excluded by a `rule spend llm requires …` (no threshold, deny) does not; 40 mandates (`@a1` … `@a40`) with three maximal day lines each give one E318 and no overflow or panic (the naive sum passes `u64::MAX` after 66 lines).
+- [ ] **L03-T33** E325 (OQ-15): `rule spend > usd 14_097 requires approve(core, 1)` and `rule spend > usd 104_588 requires approve(core, 1)` in one goal share the id `g:r_239bc3bc`; the second rule gets E325 (span on the whole rule, note on the first); in two different goals both check clean; two identical rules give only E314.
 
 ## Acceptance criteria
 - All tests pass; the JSON Schema is complete enough to reject an IR missing any required field (add one negative schema test).
