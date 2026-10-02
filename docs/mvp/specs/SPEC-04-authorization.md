@@ -11,12 +11,14 @@
 
 **Entity types:** `Person` (id = handle), `Agent` (id = agent ident), `Circle` (ident), `Goal` (ident), `Org`. `Person in [Circle]` is built from **effective holders** passed in the request. `Goal in [Org]`.
 
+The schema is `crates/maru_core/schema/openmaru.cedarschema`; `compile` validates every generated policy set against it in strict mode. The generated policies use only the principal's circles, so a request's entity store holds just the principal (a person with its circles from `effective_holders`; an agent has none).
+
 **Actions:** `Spend`, `ClaimTask`, `CreateTask`, `PostEvidence`, `PostGoalEvidence`, `ReportMetric`, `ReviewTask`, `CancelTask`, `PauseGoal`, `ResumeGoal`, `RequestClose`, `ManageSecrets`, `IssueToken`, `StartSession`.
 
 **Context record:** `{ category: String, amount_micros: Long, approved_rules: Set<String>, metric: String, goal: String, now_epoch: Long }` (unused fields are sent as `""`/`0`/`[]`).
 
 ### 2.1 Generated policies (one IR → one policy set)
-Policy IDs are deterministic; the snapshot test pins the full output for `lumen.maru`.
+Policy IDs are deterministic; the snapshot test pins the full output for `lumen.maru` (`crates/maru_core/tests/snapshots/lumen.cedar`). Order: for each goal, its steward policy, its `steward-session` policies, then per mandate its `caps`, `metrics` and `spend:<cat>` policies (each only when the mandate has such lines), then its spend rules; after all goals, one `operator:` policy per agent and one `self:` policy per person holding a mandate, in order of first appearance. Every string from the IR is written with Cedar's string escaping, and `compile` rejects an IR whose ids, handles, metric names, rule ids, dates or amounts the language would not allow. Two policies with the same id do not compile (`CompileError::DuplicatePolicyId`): a goal named `self` and a person whose handle is one of its rule ids' `r_…` part collide (OQ-13).
 
 Steward powers, per goal:
 ```cedar
@@ -66,7 +68,7 @@ permit(principal == Person::"jo", action == Action::"IssueToken", resource == Pe
 permit(principal in Circle::"core", action == Action::"StartSession", resource == Agent::"builder")
 when { context.goal == "editor" };
 ```
-(`self:` policies exist for every person holding a mandate; `steward-session` for every hosted agent with a mandate in a goal.)
+(`self:` policies exist for every person holding a mandate; `steward-session` for every hosted agent with a mandate in a goal. `operator:` policies exist for every agent, `byo` included; starting a session for a `byo` agent is refused later with `agent_not_hosted`, SPEC-06 §4.)
 
 ## 3. `decide` algorithm (Rust, `maru_core::authz`)
 
@@ -82,8 +84,18 @@ pub enum DenyReason { NoMandate, CategoryNotPermitted, PerRequestExceeded, Manda
 ```
 1. Build entities from the IR plus `req.effective_holders`; evaluate.
 2. `Allow` → `Allow`.
-3. `Deny` whose determining policies are all `@approval` forbids → re-evaluate with those IDs added to `approved_rules`. If that allows → `RequiresApproval{rule_ids sorted}`; else go to 4.
-4. `Deny{reason}` where reason comes from an explanation pass over the IR, first match wins: (Spend) no mandate → `NoMandate`; category not in spend lines → `CategoryNotPermitted`; expired → `MandateExpired`; per-request exceeded → `PerRequestExceeded`. (Capability actions) no mandate and not a steward holder → `NotSteward`; mandate lacks capability → `CapabilityMissing`; expired → `MandateExpired`. (IssueToken/StartSession) → `NotOperator`. Otherwise `Forbidden`.
+3. `Deny` whose determining policies are all `@approval` forbids (at least one) → re-evaluate with those IDs added to `approved_rules`. If that allows → `RequiresApproval{rule_ids sorted}`; else go to 4.
+4. `Deny{reason}` where reason comes from an explanation pass over the IR, first match wins. First, a resource that is not one of these → `Forbidden` (OQ-14): a goal of the spec for `Spend` and the capability actions; an agent of the spec for `StartSession`; an agent of the spec or any person for `IssueToken`. Then: (Spend) no mandate → `NoMandate`; category not in spend lines → `CategoryNotPermitted`; expired → `MandateExpired`; per-request exceeded → `PerRequestExceeded`. (Capability actions) no mandate and not a steward holder → `NotSteward`; mandate lacks capability → `CapabilityMissing`; expired → `MandateExpired`. (IssueToken/StartSession) → `NotOperator`. Otherwise `Forbidden`.
+
+`decide` fails closed: a request Cedar cannot evaluate is `Deny{Forbidden}`. `amount_micros` above `i64::MAX` (Cedar's `Long`) is sent as `i64::MAX`, which is above every amount a spec can state. Only the policies naming the request's resource are evaluated (every generated policy has `resource == …`), which keeps `decide` independent of the spec's size.
+
+**JSON** (NIF `decide(handle, request_json)`, vectors in `crates/maru_core/tests/vectors/decide.json` as `{name, ir_fixture, request, expected}`, with `ir_fixture` a file in `crates/maru_core/tests/fixtures/`). Every field is required and no other is accepted; actions and reasons are snake_case:
+```json
+{"principal": {"kind": "agent", "id": "builder"}, "action": "spend", "resource": {"kind": "goal", "id": "editor"},
+ "context": {"category": "llm", "amount_micros": 10000000, "approved_rules": [], "metric": "", "goal": "", "now_epoch": 1790812800},
+ "effective_holders": {"core": ["mina", "jo"]}}
+```
+`principal.kind` is `person` or `agent`; `resource.kind` is `goal`, `agent` or `person`; `action` is one of `spend`, `claim_task`, `create_task`, `post_evidence`, `post_goal_evidence`, `report_metric`, `review_task`, `cancel_task`, `pause_goal`, `resume_goal`, `request_close`, `manage_secrets`, `issue_token`, `start_session`. Decisions: `{"decision": "allow"}`, `{"decision": "deny", "reason": "per_request_exceeded"}`, `{"decision": "requires_approval", "rule_ids": ["editor:r_…"]}`.
 
 Performance: `decide` p95 < 2 ms for a 2,000-line spec. The NIF exposes `compile/1` returning a resource handle cached per spec version (`:persistent_term` keyed by version id).
 
