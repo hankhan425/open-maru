@@ -211,6 +211,14 @@ ARCHITECTURE > PRD.
   sign-up (c) can be added after the MVP as its own task. Without the field there is no passkey
   autofill (conditional mediation); the passkey button opens the browser's passkey picker.
   SPEC-08 §3 and F01 are updated.
+- **Follow-up (user, 2026-10-02):** with no email there is no account recovery: a user with one
+  passkey who loses it loses the account, and the handle stays taken (OQ-7). That is acceptable
+  while the MVP is not released; a recovery path (email sign-up, or another) is needed before any
+  public release. F01 already offers a second passkey or a linked provider. Testing as several
+  personas (founder, holder, member, operator, agent, donor, visitor) without a passkey or provider
+  account each is planned in H01, not earlier: its e2e-only sign-in is also compiled into dev
+  builds, with a persona seed, a dev-only persona switcher and a token task for the CLI and MCP
+  (H01-T12).
 
 ### OQ-9: Leading zeros in metric values and the spec hash
 - **Task:** L02
