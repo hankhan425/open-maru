@@ -1,69 +1,22 @@
 defmodule OpenmaruWeb.Plugs.Session do
   @moduledoc """
-  Web sessions from the `_om_session` cookie (SPEC-09 §1).
-
-  `call/2` resolves the cookie with `Openmaru.Accounts.get_session_user/1` and assigns
-  `:current_user`, `:current_session` and `:current_actor` (`{:person, user}`). When the
-  lookup slides the expiry, the cookie is re-sent with a fresh 30-day `max-age`. An
-  unknown, expired or revoked cookie is cleared; a suspended user's session leaves the
-  request anonymous with `:auth_error` set, which `require_user/2` returns (403).
+  The web session cookie `_om_session` (SPEC-09 §1): signing in, and setting or
+  clearing the cookie. `OpenmaruWeb.Plugs.ApiAuth` resolves the cookie on each request
+  (its cookie branch), and its `require_*` plugs guard routes.
 
   The cookie is `HttpOnly; Secure; SameSite=Lax` on path `/`.
   """
 
-  @behaviour Plug
-
   import Plug.Conn
 
-  alias Openmaru.{Accounts, Error}
+  alias Openmaru.Accounts
   alias Openmaru.Accounts.{User, UserSession}
-  alias OpenmaruWeb.FallbackController
 
   @cookie "_om_session"
 
-  @impl Plug
-  def init(opts), do: opts
-
-  @impl Plug
-  def call(conn, _opts) do
-    conn = fetch_cookies(conn)
-
-    case conn.cookies[@cookie] do
-      nil -> conn
-      token -> load(conn, token)
-    end
-  end
-
-  defp load(conn, token) do
-    case Accounts.get_session_user(token) do
-      {:ok, user, session} ->
-        conn
-        |> assign(:current_user, user)
-        |> assign(:current_session, session)
-        |> assign(:current_actor, {:person, user})
-        |> refresh_cookie(token, session)
-
-      {:error, %Error{code: :unauthenticated}} ->
-        delete_session_cookie(conn)
-
-      {:error, %Error{} = error} ->
-        assign(conn, :auth_error, error)
-    end
-  end
-
-  defp refresh_cookie(conn, token, %UserSession{extended: true} = session),
-    do: put_session_cookie(conn, token, session)
-
-  defp refresh_cookie(conn, _token, _session), do: conn
-
-  @doc "Function plug: halts with 401 `unauthenticated` (or `:auth_error`) unless signed in."
-  @spec require_user(Plug.Conn.t(), term()) :: Plug.Conn.t()
-  def require_user(%Plug.Conn{assigns: %{current_user: %User{}}} = conn, _opts), do: conn
-
-  def require_user(conn, _opts) do
-    error = conn.assigns[:auth_error] || Error.new(:unauthenticated, "Not signed in")
-    conn |> FallbackController.call({:error, error}) |> halt()
-  end
+  @doc "The session cookie's name."
+  @spec cookie_name() :: String.t()
+  def cookie_name, do: @cookie
 
   @doc """
   Starts a session for `user` and sets its cookie. A session the request already

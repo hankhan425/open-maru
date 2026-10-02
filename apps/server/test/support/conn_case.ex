@@ -79,6 +79,10 @@ defmodule OpenmaruWeb.ConnCase do
     put_req_cookie(conn, @session_cookie, token)
   end
 
+  @doc "Puts `authorization: Bearer <token>` on `conn`."
+  @spec put_bearer(Plug.Conn.t(), String.t()) :: Plug.Conn.t()
+  def put_bearer(conn, token), do: put_req_header(conn, "authorization", "Bearer " <> token)
+
   @doc "Fetches the CSRF token for `conn`'s session cookie."
   @spec csrf_token(Plug.Conn.t()) :: String.t()
   def csrf_token(conn) do

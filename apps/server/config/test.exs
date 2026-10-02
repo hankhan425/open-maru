@@ -31,7 +31,10 @@ config :openmaru, Openmaru.Accounts.OAuth,
   ]
 
 # Mox mocks (defined in test/support/mocks.ex) replace these implementations.
-config :openmaru, clock: Openmaru.ClockMock, health: Openmaru.HealthMock
+config :openmaru,
+  clock: Openmaru.ClockMock,
+  health: Openmaru.HealthMock,
+  token_verifier: Openmaru.Mandates.TokenVerifierMock
 
 # Print only warnings and errors during test
 config :logger, level: :warning

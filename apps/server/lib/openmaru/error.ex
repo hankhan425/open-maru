@@ -61,6 +61,12 @@ defmodule Openmaru.Error do
     rate_limited: 429,
     provider_error: 502,
     gateway_timeout: 504,
+    # Device login (RFC 8628 §3.5, which answers them all with 400).
+    authorization_pending: 400,
+    slow_down: 400,
+    expired_token: 400,
+    access_denied: 400,
+    invalid_grant: 400,
     internal_error: 500
   }
 

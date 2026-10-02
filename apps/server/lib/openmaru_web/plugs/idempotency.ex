@@ -12,7 +12,9 @@ defmodule OpenmaruWeb.Plugs.Idempotency do
     * same key, different request (or the first still running) — 409
       `idempotency_conflict`.
 
-  5xx and streamed responses are not stored. Requests without the header pass through.
+  5xx and streamed responses are not stored, nor responses whose action called
+  `skip_store/1` because they carry a secret shown once (a new token): the key is
+  released, so a retry runs the action again. Requests without the header pass through.
   """
 
   @behaviour Plug
@@ -26,6 +28,7 @@ defmodule OpenmaruWeb.Plugs.Idempotency do
   @header "idempotency-key"
   @max_key_length 255
   @mutations ~w(POST PUT PATCH DELETE)
+  @skip_store :openmaru_idempotency_skip_store
 
   @impl Plug
   def init(opts), do: opts
@@ -39,6 +42,13 @@ defmodule OpenmaruWeb.Plugs.Idempotency do
   end
 
   def call(conn, _opts), do: conn
+
+  @doc """
+  Marks the response as not to be kept for replays (it carries a secret, e.g. a token
+  shown once). Call it from the action before sending.
+  """
+  @spec skip_store(Plug.Conn.t()) :: Plug.Conn.t()
+  def skip_store(conn), do: put_private(conn, @skip_store, true)
 
   defp handle(conn, key) when byte_size(key) == 0 or byte_size(key) > @max_key_length do
     error = Error.new(:invalid_request, "Idempotency-Key must be 1-#{@max_key_length} bytes")
@@ -60,6 +70,11 @@ defmodule OpenmaruWeb.Plugs.Idempotency do
       {:error, %Error{} = error} ->
         conn |> FallbackController.call({:error, error}) |> halt()
     end
+  end
+
+  defp store(%Plug.Conn{private: %{@skip_store => true}} = conn, record) do
+    :ok = Idempotency.release(record)
+    conn
   end
 
   defp store(%Plug.Conn{state: :set, status: status, resp_body: body} = conn, record)

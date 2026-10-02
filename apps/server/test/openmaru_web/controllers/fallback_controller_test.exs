@@ -51,7 +51,12 @@ defmodule OpenmaruWeb.FallbackControllerTest do
     rate_limited: 429,
     provider_error: 502,
     gateway_timeout: 504,
-    task_not_in_goal: 403
+    task_not_in_goal: 403,
+    authorization_pending: 400,
+    slow_down: 400,
+    expired_token: 400,
+    access_denied: 400,
+    invalid_grant: 400
   ]
 
   for {code, status} <- @spec_codes do

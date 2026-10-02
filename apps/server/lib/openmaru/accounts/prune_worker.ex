@@ -1,5 +1,5 @@
 defmodule Openmaru.Accounts.PruneWorker do
-  @moduledoc "Hourly cleanup of expired auth challenges and dead sessions (`Openmaru.Accounts.prune/0`)."
+  @moduledoc "Hourly cleanup of expired auth challenges, dead sessions and old device codes (`Openmaru.Accounts.prune/0`)."
 
   use Oban.Worker, queue: :scheduled, max_attempts: 3
 
