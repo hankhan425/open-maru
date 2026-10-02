@@ -254,7 +254,7 @@ ARCHITECTURE > PRD.
 
 ### OQ-12: Charter cases SPEC-01 §8 does not cover
 - **Task:** L04
-- **Status:** open
+- **Status:** resolved
 - **Conflict:** SPEC-01 §8 gives the charter's templates, but not these cases:
   1. **Text from the spec in Markdown.** Names, titles and purposes are spec strings. They may hold
      `\n` (§2) and Markdown syntax, and the templates insert them verbatim. Take a purpose
@@ -299,4 +299,9 @@ ARCHITECTURE > PRD.
      `l04_large_numbers_are_grouped`.
 
   SPEC-01 §8 records these choices, marked interim.
-- **Resolution:**
+- **Resolution:** All three interim choices are kept. SPEC-01 §8 now states them as regular rules,
+  without the interim markers:
+  1. Spec text is written on one line, Markdown-escaped, in both the Markdown and the structured
+     form. It renders literally, so the charter's structure comes only from the templates.
+  2. `## Circles` is omitted when the org has none.
+  3. Every number in the text is grouped by thousands.

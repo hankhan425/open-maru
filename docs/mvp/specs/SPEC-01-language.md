@@ -285,7 +285,7 @@ For each goal, `unapproved_monthly_max_micros` is an upper bound on spend possib
 
 Deterministic IR → Markdown. Never uses an LLM. Structure and exact sentences are defined by the golden file `examples/lumen.charter.md` plus these templates. Every default is rendered explicitly.
 
-**Sections in order:** `# <org name>`, purpose paragraph (if any), `## Membership`, `## Changing this charter`, `## Circles` (omitted if none, which needs an org with no goals and `amend: vote(members, …)`; interim, OQ-12), `## Agents` (omitted if none), then per goal `## Goal: <title>` with purpose paragraph, bullet facts, `### Mandates` (omitted if none), `### Rules` (omitted if none), `### Limits`.
+**Sections in order:** `# <org name>`, purpose paragraph (if any), `## Membership`, `## Changing this charter`, `## Circles` (omitted if none, which needs an org with no goals and `amend: vote(members, …)`), `## Agents` (omitted if none), then per goal `## Goal: <title>` with purpose paragraph, bullet facts, `### Mandates` (omitted if none), `### Rules` (omitted if none), `### Limits`.
 
 **Formatting helpers**
 - Money: `$12,000` for whole dollars; otherwise at least 2 and at most 6 decimals, trailing zeros trimmed past 2: `$12.50`, `$0.000125`.
@@ -293,7 +293,7 @@ Deterministic IR → Markdown. Never uses an LLM. Structure and exact sentences 
 - Dates: `June 30, 2027`.
 - Lists: `a`; `a and b`; `a, b, and c`.
 - Thresholds: `1/2`→`half`, `1/3`→`one-third`, `2/3`→`two-thirds`, `3/4`→`three-quarters`, other fractions `a/b`, percents `60%`.
-- Numbers: counts, vacancies, duration counts and the parts of a fraction threshold are grouped by thousands like metric values: `10,000 seats`, `36,500 days`, `1,000/3,000` (interim, OQ-12).
+- Numbers: counts, vacancies, duration counts and the parts of a fraction threshold are grouped by thousands like metric values: `10,000 seats`, `36,500 days`, `1,000/3,000`.
 
 **Templates**
 - Membership: `Anyone signed in to openmaru can join.` / `New members join when N existing member(s) sponsor(s) them.` (N=1: "member sponsors"; N>1: "members sponsor").
@@ -309,7 +309,7 @@ Deterministic IR → Markdown. Never uses an LLM. Structure and exact sentences 
 - Rule: `- <subject> needs <approval from N holder(s) of C | a vote of C, passing with at least T of its holders in favour | a vote of all members, passing with at least T of them in favour> within <D>; otherwise <outcome>.` Outcome: spend deny `it is denied`, spend allow `it is allowed`, close deny `it stays open`, close allow `it is closed`.
 - Limits: `Without any approval, at most <$X> per month can be spent on this goal.`; zero while some mandate has a spend line: `Nothing can be spent on this goal without approval.`; no spend lines at all: `No one may spend from this goal.`
 
-**Text from the spec** (the org name, goal titles, purposes, ids, handles and metric names) is written on one line and renders literally (interim, OQ-12). Each run of whitespace, line breaks included, becomes one space, and the text is trimmed. A backslash goes before `\`, `` ` ``, `*`, `[`, `]` and `~`; before `_` unless it is between two letters or digits; before `<` followed by a letter, `/`, `!` or `?`; and before `&` that starts an entity (`&amp;`, `&#35;`). It also goes before a block marker at the start of the text (`#`; `>`; `-` before a space, `-` or the end; `+` before a space or the end; the `.` or `)` after 1–9 leading digits, as in `1. `), and before the first `#` of a closing run at the end (`Lumen #`). A purpose that is empty after trimming has no paragraph; an empty heading is a bare `#`.
+**Text from the spec** (the org name, goal titles, purposes, ids, handles and metric names) is written on one line and renders literally, so it cannot add a heading, list or link to the charter. Each run of whitespace, line breaks included, becomes one space, and the text is trimmed. A backslash goes before `\`, `` ` ``, `*`, `[`, `]` and `~`; before `_` unless it is between two letters or digits; before `<` followed by a letter, `/`, `!` or `?`; and before `&` that starts an entity (`&amp;`, `&#35;`). It also goes before a block marker at the start of the text (`#`; `>`; `-` before a space, `-` or the end; `+` before a space or the end; the `.` or `)` after 1–9 leading digits, as in `1. `), and before the first `#` of a closing run at the end (`Lumen #`). A purpose that is empty after trimming has no paragraph; an empty heading is a bare `#`.
 
 The renderer also returns a structured form for the web UI: `[{"section": "…", "level": 2, "paragraphs": ["…"], "bullets": ["…"]}]`. `section` is the heading text and `level` its Markdown level (1 for the org, 2 for org-level sections and goals, 3 within a goal). Paragraphs come before bullets, and bullets have no `- ` marker. Every string is Markdown inline text (`**bold**` ids, escaped spec text). The Markdown charter is built from this form: each heading, paragraph and bullet list is one block, blocks are separated by one blank line, and the file ends with one newline.
 
