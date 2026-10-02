@@ -8,8 +8,10 @@ defmodule OpenmaruWeb.Plugs.ApiAuthTest.EchoController do
   @moduledoc false
   use Phoenix.Controller, formats: [:json]
 
+  alias OpenmaruWeb.Plugs.ApiAuthTest
+
   def show(conn, _params) do
-    actor = OpenmaruWeb.Plugs.ApiAuthTest.describe(conn.assigns[:current_actor])
+    actor = ApiAuthTest.describe(conn.assigns[:current_actor])
     json(conn, %{actor: actor})
   end
 end
@@ -20,6 +22,7 @@ defmodule OpenmaruWeb.Plugs.ApiAuthTest.Router do
   @moduledoc false
   use Phoenix.Router
 
+  alias OpenmaruWeb.Plugs.ApiAuth
   alias OpenmaruWeb.Plugs.ApiAuthTest.EchoController
 
   pipeline :api do
@@ -48,7 +51,7 @@ defmodule OpenmaruWeb.Plugs.ApiAuthTest.Router do
   end
 
   def allow_mandate_tokens(conn, opts),
-    do: OpenmaruWeb.Plugs.ApiAuth.allow_mandate_tokens(conn, opts)
+    do: ApiAuth.allow_mandate_tokens(conn, opts)
 end
 
 defmodule OpenmaruWeb.Plugs.ApiAuthTest do
@@ -58,6 +61,7 @@ defmodule OpenmaruWeb.Plugs.ApiAuthTest do
 
   alias Openmaru.Accounts.{PAT, User}
   alias Openmaru.{ClockMock, Repo, TypeID}
+  alias Openmaru.Mandates.TokenVerifier.Unimplemented
   alias Openmaru.Mandates.TokenVerifierMock
   alias OpenmaruWeb.Plugs.ApiAuthTest.{FakeAgent, Router}
 
@@ -297,7 +301,7 @@ defmodule OpenmaruWeb.Plugs.ApiAuthTest do
              } =
                json_response(conn, 401)
 
-      assert Openmaru.Mandates.TokenVerifier.Unimplemented.verify("om_mt_x", %{
+      assert Unimplemented.verify("om_mt_x", %{
                operation: :api,
                time: @t0
              }) == {:error, :not_implemented}
@@ -320,7 +324,10 @@ defmodule OpenmaruWeb.Plugs.ApiAuthTest do
     end
 
     test "C02-T10 :mandate_ok piped after the auth plug raises", %{conn: conn} do
-      assert_raise ArgumentError, ~r/mandate_ok/, fn -> test_route(conn, "/misordered") end
+      # Phoenix wraps exceptions raised in a pipeline.
+      error = assert_raise Plug.Conn.WrapperError, fn -> test_route(conn, "/misordered") end
+      assert %ArgumentError{message: message} = error.reason
+      assert message =~ "mandate_ok"
     end
   end
 

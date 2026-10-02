@@ -2,10 +2,11 @@ defmodule OpenmaruWeb.Plugs.CSRF do
   @moduledoc """
   CSRF protection for cookie-authenticated mutations (SPEC-09 §1, CONVENTIONS §5).
 
-  A `POST`, `PUT`, `PATCH` or `DELETE` that carries a valid session
-  (`conn.assigns.current_session`, set by `OpenmaruWeb.Plugs.Session`) must send the
-  session's token in `x-csrf-token`, or it fails with 403 `forbidden`. Requests without
-  a session cookie (anonymous, or bearer-authenticated) are not checked.
+  A `POST`, `PUT`, `PATCH` or `DELETE` authenticated by the session cookie
+  (`conn.assigns.current_session`, which `OpenmaruWeb.Plugs.ApiAuth` sets only in its
+  cookie branch) must send the session's token in `x-csrf-token`, or it fails with 403
+  `forbidden`. Anonymous and bearer-authenticated requests are not checked, including a
+  request whose bearer header won over a cookie it also carried (C02).
 
   The token is an HMAC of the session's token hash under a key derived from the
   endpoint's `secret_key_base`: stable for the session's lifetime, different for every

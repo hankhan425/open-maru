@@ -48,15 +48,15 @@ defmodule Openmaru.Mandates.TokenVerifier do
   @callback verify(token :: String.t(), facts :: request_facts()) ::
               {:ok, actor()} | {:error, reason()}
 
-  @impl_module Application.compile_env(
-                 :openmaru,
-                 :token_verifier,
-                 Openmaru.Mandates.TokenVerifier.Unimplemented
-               )
-
-  @doc "Verifies `token` with the configured implementation."
+  @doc "Verifies `token` with the configured implementation (`config :openmaru, :token_verifier`)."
   @spec verify(String.t(), request_facts()) :: {:ok, actor()} | {:error, reason()}
-  def verify(token, facts), do: @impl_module.verify(token, facts)
+  def verify(token, facts), do: impl().verify(token, facts)
+
+  # Read at runtime: with a compile-time module, Dialyzer would type every caller
+  # against the placeholder, which never succeeds.
+  defp impl do
+    Application.get_env(:openmaru, :token_verifier, Openmaru.Mandates.TokenVerifier.Unimplemented)
+  end
 end
 
 defmodule Openmaru.Mandates.TokenVerifier.Unimplemented do
