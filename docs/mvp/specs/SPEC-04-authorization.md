@@ -134,7 +134,7 @@ allow if mandate($m);
 ### 5.1 `Openmaru.Mandates.authorize(actor, action, target, context \\ %{})`
 1. Load the org's active version handle (cached).
 2. Goal state: `closed` → `goal_closed`; `paused` blocks `Spend`, `ClaimTask`, `StartSession` with `goal_paused`.
-3. Agent actors (token): the token's mandate must be the active mandate for (goal, principal) → else `mandate_revoked`.
+3. Agent actors (token): the token's mandate must be the active mandate for (goal, principal) → else `mandate_revoked`. Agent actors, and `IssueToken`/`StartSession` on an agent: the agent's operator must be an active member of the org who is neither silent nor suspended → else `operator_unavailable` (SPEC-02 §3.6). A person who departed holds no seat or mandate, so `decide` already denies them.
 4. Build `effective_holders` (SPEC-02 §3.4); call `Lang.decide`.
 5. Return `:allow | {:requires_approval, rule_ids} | {:deny, code}` where code is the snake_case `DenyReason`.
 

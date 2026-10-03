@@ -13,7 +13,8 @@ Org administrators connect their own Stripe account; webhooks are received secur
 ## Deliverables
 - `Openmaru.Payments.StripeClient` behaviour (full callback list from SPEC-05 §7) + `stripity_stripe` implementation + Mox mock.
 - Migrations `stripe_accounts`, `stripe_events`.
-- `Openmaru.Payments.administrators(org)` per SPEC-05 §2.
+- Administrators per SPEC-05 §2 through C03's `Orgs.administrators/1`.
+- `stripe_accounts.connected_by_user_id`: the administrator who started onboarding (P05 uses it for payments continuity, SPEC-05 §8.8).
 - Onboarding + status endpoints.
 - Two webhook endpoints with separate secrets, raw-body signature verification, store-then-process via Oban worker, dispatch by event type (only `account.updated` handled here; P02 adds more handlers through a dispatch map).
 

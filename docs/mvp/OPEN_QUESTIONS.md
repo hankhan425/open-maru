@@ -192,8 +192,8 @@ ARCHITECTURE > PRD.
   removing it, that is a separate path after the MVP. SPEC-09 §4, SPEC-02 §2 and H02-T08 are
   updated. C01's `deleted-user-` prefix reservation stays, so no live handle reads as a deleted
   account.
-- **Follow-up:** what deletion and leaving do to the person's roles in their orgs is OQ-16 (open;
-  task C07).
+- **Follow-up:** what deletion and leaving do to the person's roles in their orgs is OQ-16
+  (resolved; tasks C07, P04, P05).
 
 ### OQ-8: The email field on the sign-in card
 - **Task:** C01 (affects F01)
@@ -412,58 +412,88 @@ ARCHITECTURE > PRD.
   (`l03_t33_rules_with_one_id_in_a_goal_is_e325`), `l06_rules_with_colliding_ids_do_not_compile`
   (now on an IR edited after checking).
 
-### OQ-16: A person who leaves, deletes their account or goes inactive while the org needs them
-- **Task:** review of OQ-7 (affects C03, C04, M02, H02; new task C07)
-- **Status:** open
+### OQ-16: People who leave or go silent, and protecting other people's money
+- **Task:** review of OQ-7 (affects C03, C04, C06, G02, M02, P01, P02, H01, H02; new tasks C07, P04, P05)
+- **Status:** resolved
 - **Conflict:** OQ-7 kept a deleted user's handle but did not say what happens to that user's
   roles in the orgs they belong to.
-  - **A deleted holder keeps counting.** Effective holders (SPEC-02 §3.4) don't look at
-    `deleted_at`, so the account still counts in every vote and approval. In lumen
-    (`amend: vote(core, 2/3)`, holders @mina and @jo), if jo deletes their account, 2 of 2 votes
-    are required for good. Every amendment fails, including one that removes jo. Once the terms
-    lapse, the holdover rule brings both back as eligible. Spend approvals and closing then fail
-    with `no_eligible_voters`.
-  - **Agents lose their accountable human.** A deleted operator's agent keeps valid tokens for
-    up to 90 days.
-  - **The leave rule is wrong both ways.** Deletion gets around SPEC-02 §3.5's rule that holders
-    and operators can't leave while listed. And that rule means a holder can never leave without
-    the org's consent.
-- **Options:**
-  - (a) Refuse deletion while the user is listed, as for leaving.
-  - (b) Leaving and deletion end the person's roles at once, and the amend rule shrinks to who
-    remains: all remaining holders, or all members by a two-thirds vote if the circle is empty.
-  - (c) As (b), but spend approvals and closing shrink too.
-  - (d) The user's direction below.
-- **Direction (user, 2026-10-02):**
-  - An org has an owner, who must transfer ownership before leaving or deleting their account.
-  - Everyone else may leave.
-  - When a member leaves or becomes inactive, the owner or the administrators decide who takes
-    over their roles.
-  - If the owner becomes inactive, members can fork the org.
+  - **A deleted holder kept counting.** Effective holders (SPEC-02 §3.4) didn't look at
+    `deleted_at`, so the account still counted in every vote and approval. In lumen
+    (`amend: vote(core, 2/3)`, holders @mina and @jo), jo deleting their account made 2 of 2 votes
+    necessary for good, and after the terms lapsed the holdover rule brought both back as
+    eligible.
+  - **Silence did the same.** A holder in hospital doesn't leave, so they keep counting the same
+    way.
+  - **Agents lost their accountable human.** A deleted operator's agent kept valid tokens for up
+    to 90 days.
+  - **The leave rule was wrong both ways.** Holders and operators couldn't leave while listed,
+    and deletion got around that.
+  - **Member-wide votes couldn't pass at scale.** `vote(members, T)` needed T of all members, so
+    every member who didn't vote counted against it.
+- **Options:** (a) refuse deletion while listed; (b) leaving ends roles and the amend rule shrinks
+  to who remains; (c) as (b) with every rule shrinking; (d) an owner who must transfer ownership
+  before leaving, with successions decided by the owner or the administrators, and forks; (e) the
+  final direction below.
+- **Direction (user, 2026-10-02):** (d) was recorded first, then replaced by (e):
+  - Owners and holders may leave or go silent whenever they like, and many will.
+  - An org that uses only its own money needs no rules for that.
+  - Strict, game-theory-backed rules apply to taking other people's money.
+  - The rule set should hold for orgs of 1 to hundreds of thousands of people.
+  - Member-wide votes count votes cast, and this goes in now.
+- **Resolution (user, 2026-10-02):**
+  1. **No owner role.** Anyone may leave at any time. Leaving (and account deletion, which leaves
+     every org) ends the person's membership, seats, mandates and operator roles at once
+     (SPEC-02 §3.6). An agent whose operator has departed, is silent or suspended is refused with
+     `operator_unavailable`. `must_be_removed_by_amendment` is removed.
+  2. **Silence.** A person with no sign-in or authenticated request for 90 days is silent, and
+     stops counting toward decisions and funding tiers until they return. Suspended users don't
+     count either (SPEC-02 §3.4).
+  3. **Amend shrinks.** An amend decision shrinks to the people who remain: all remaining
+     holders, or `vote(members, 2/3)` if the circle has none. Spend and close decisions never
+     shrink (SPEC-02 §4.1). The org is never frozen for good. A 2-person org waits 90 days for a
+     silent partner; a 1-person org goes dormant, or a member it added carries on.
+  4. **Member-wide votes** count votes cast: at least 20% of eligible members must vote, and only
+     members of at least 30 days are eligible. The vote ends early only when the outcome can no
+     longer change (SPEC-01 §4.7, SPEC-02 §4.2–§4.3; the L04 charter sentence is updated). Circle
+     votes still count every holder.
+  5. **Own funds and outside money.** Own funds are recorded by an administrator as `attested`
+     (SPEC-03 §5.6). Outside money is protected by SPEC-05 §8:
+     - funding tiers: 0 own funds only; 1 pledges, after 30 days and a track record of accepted
+       spend; 2 upfront donations, after 90 days at tier 1, with 2 qualifying stewards;
+     - pledges that pay back up to 80% of accepted spend, after the fact;
+     - goal-only donations, capped at 3 × the average monthly accepted spend, tracked as
+       first-in-first-out lots;
+     - money-safety checks E505–E507;
+     - a 14-day waiting period with donor exit for every amendment that doesn't only tighten;
+     - liveness steps at 30/45/60/90 days of steward silence, ending in refunds;
+     - payments continuity when whoever connected Stripe is gone;
+     - refunds of unspent outside money when a goal closes;
+     - pledges that may follow a member's fork;
+     - a permanent public record of dormancy.
+  6. **Forks** copy only a spec into a new org (SPEC-02 §3.7).
+  7. **Settings.** None of these rules is a spec setting in the MVP. Later, orgs may only make
+     the outside-money values stricter; rules that only affect their own people may become
+     bounded settings (SPEC-05 §8.10). This was the recommendation, which the user did not
+     contest.
+  8. **What this can't do.** Payments are non-custodial, so refunds are best effort. The rules
+     bound outsiders' losses: nothing ahead of accepted work for pledges, and at most a goal's cap
+     for donations. Every loss is public (SPEC-05 §8.11).
 
-  This was too large for the review PR, so it is task C07. Successions refill a circle, so the
-  shrinking amend rule of (b) is not needed.
-- **Proposed (confirm before C07 starts; details in C07):**
-  1. **Owner.** A platform role outside the spec, one per org, initially the creator. Its powers
-     are transferring ownership and deciding successions. Transfer needs the recipient's
-     acceptance.
-  2. **Leaving.** Leaving ends membership, seats, operator roles (agents stopped) and mandates
-     (tokens revoked) at once. The spec still names the person until a succession or amendment.
-     Rejoining restores neither seats nor mandates.
-  3. **Inactive.** No authenticated activity for 90 days. The person is notified when a
-     succession starts, and an objection within 7 days cancels it.
-  4. **Succession.** It passes on the owner's approval, or on a majority of the remaining
-     administrators (SPEC-05 §2), within 7 days. It replaces the person's handle with the
-     successor's everywhere and changes nothing else.
-     - This makes it the one spec change that bypasses the `amend` rule (SPEC-01 §4.1). It is
-       limited to people who left or are inactive, and the org page states it.
-     - Should the charter state it too?
-  5. **Fork.** A fork copies only the active spec into a new org, which the forker creates and
-     owns. No funds, members, Stripe account or history are copied, and the two orgs link to each
-     other. PRD §6 now has such forks in scope.
-  6. **Suspension.** A suspended holder still counts in votes too. Should suspension (SPEC-09
-     §6) take the person out of eligibility while it lasts?
-- **Chosen (interim):** the current specs. Holders and operators can't leave while listed
-  (C03-T17). Account deletion is H02, which comes after C07 and follows it. H02-T08 also revokes
-  the deleted user's sessions, PATs and mandate tokens.
+  Specs updated: PRD, SPEC-01 §4.1, §4.7, §8; SPEC-02; SPEC-03; SPEC-04 §5.1; SPEC-05 §1, §3,
+  §4, §5, §7, §8; SPEC-07; SPEC-08 §3; SPEC-09 §4, §6. Tasks: C07 (leaving, silence, forks), P04
+  (tiers, pledges, caps) and P05 (waiting period, exit, dormancy, continuity) are new; C03, C04,
+  C06, G02, G03, P01, P02, F06, F07, H01, H02 and TASKS.md are updated. The audit brief for
+  outside reviewers summarizes all of it.
+
+### OQ-17: Do upfront donations stay in the MVP?
+- **Task:** OQ-16 (affects P02, P04, P05, F07, H01)
+- **Status:** open
+- **Conflict:** The PRD's core loop and success criteria were written around donations made
+  before the work. Under OQ-16 those are the hardest tier to reach (90 days at tier 1) and need
+  the most protection (cap, lots, waiting period and exit, dormancy refunds, continuity), while
+  pledges are safe by construction.
+- **Options:** (a) keep both tiers in the MVP; (b) ship pledges only, and move upfront donations
+  (P02's checkout, the cap and lots in P04, and most of P05) after the MVP.
+- **Chosen (interim):** (a), so the plan and specs cover the complete rule set; cutting (b) later
+  removes work rather than adding it.
 - **Resolution:**

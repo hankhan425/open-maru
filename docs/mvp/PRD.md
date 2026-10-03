@@ -11,11 +11,13 @@ Organizations describe themselves in **maru**, a precise, human-readable languag
 ## 3. The core loop (the MVP must prove this end to end)
 
 ```
-Donate → funds earmarked to a goal (ledger)
+Fund → the org funds a goal with its own money (ledger); once it has a track record,
+       donors pledge to pay for accepted work, and later may donate up front
       → governance issues a mandate to an agent (spec)
       → agent works: claims tasks, calls models through the metered gateway
       → every call is authorized, held, and posted to the ledger (verified tier)
       → agent posts evidence; steward accepts the work
+      → pledges pay back the accepted work each month
       → public goal page shows progress, spend by provenance tier, and evidence live
 ```
 
@@ -41,13 +43,14 @@ Agent-operated open-source software goals (example: an open cloud image editor).
 - Deterministic charter (plain English) rendering, semantic diff, static limit analysis ("max spend without approval").
 - Toolchain from one Rust crate: server (NIF), browser (WASM), CLI.
 - Accounts: passkeys, GitHub, Google; CLI device login; personal access tokens.
-- Ownership and leaving: each org has an owner (initially its creator) who hands ownership on before leaving; anyone else may leave at any time; the owner or the org's administrators appoint successors to people who left or went inactive; members can fork an org, copying its spec into a new org (task C07, OQ-16).
+- Leaving and silence: anyone may leave at any time; people silent for 90 days stop counting toward decisions; an amend decision shrinks to the people who remain; member-wide votes count votes cast, with 20% turnout and members of 30 days; anyone can fork an org's spec into a new org (C04, C07; OQ-16).
+- Outside money: an org that spends only its own funds has no extra rules. Pledges (donors pay for accepted work) and upfront donations are earned through funding tiers, with a cap on unspent outside money, a waiting period with donor exit before rule changes, and dormancy that refunds unspent money when stewards go silent (P04, P05; SPEC-05 §8; OQ-16).
 - Orgs with versioned, content-addressed specs; amendment proposals decided by the spec's own `amend` rule.
 - Decisions engine (approve-N / vote-threshold, deadlines, default outcomes) used for amendments, gated spend, and goal closure.
 - Ledger: double-entry, integer micro-USD, two-phase holds, linked transfers, balance constraints, idempotency, hash chain, daily public checkpoints.
 - Goals: monthly/one-time funding from treasury, underfunded handling, pause/resume (kill switch), closure with fund disposition, success metric reporting.
 - Mandates enforced via Cedar; mandate tokens via Biscuit (attenuable, revocable).
-- Stripe Connect (Standard accounts, direct charges): onboarding, one-time and monthly donations earmarked to goal or treasury, fee breakdown, refunds, daily reconciliation.
+- Stripe Connect (Standard accounts, direct charges): onboarding, pledges and one-time and monthly donations earmarked to a goal, fee breakdown, refunds, daily reconciliation.
 - Metered LLM gateway: Anthropic Messages and OpenAI Chat Completions, BYOK (goal's own provider keys), streaming, holds, exact posting.
 - Tasks, leases, evidence, steward review.
 - Hosted runtime via E2B (BYOK), compute metering, session supervision.
@@ -61,14 +64,16 @@ Agent-operated open-source software goals (example: an open cloud image editor).
 - Paying people through the platform (reimbursements are approved on-platform and paid off-platform with proof).
 - Tax-deductible giving, fiscal hosting.
 - Cross-org flows, inheritance/federations, forks that carry funds, members or history, relationships beyond shared members.
+- Spec settings for the outside-money rules (orgs may later only make them stricter), all-or-nothing pledges, donations to the treasury.
 - Quadratic voting, elections, apply-to-join membership.
 - Physical-world goals, beneficiary data.
 - Field-level private visibility (MVP: everything public except receipts, secrets, donor identity).
 
 ## 7. Success criteria for MVP
 
-- A new user creates an org, writes a valid spec with a funded goal, and connects Stripe in under 15 minutes.
-- A donor completes a donation in under 60 seconds; the goal page reflects it within 10 seconds of the Stripe webhook.
+- A new user creates an org, writes a valid spec, and funds a goal with their own money in under 15 minutes (Stripe is needed only for outside money).
+- A donor completes a pledge or a donation in under 60 seconds; the goal page reflects it within 10 seconds of the Stripe webhook.
+- A goal holding outside money whose stewards go silent closes to new money by day 45 and refunds what is unspent by day 90.
 - A BYO agent (e.g. Claude Code pointed at the gateway) completes a task; 100% of its model spend appears on the public ledger as *verified* with model and token counts.
 - A spend exceeding a mandate or budget is refused with a specific, machine-readable reason.
 - Pausing a goal stops all its sessions and blocks all its spend within 5 seconds.
@@ -92,9 +97,15 @@ Agent-operated open-source software goals (example: an open cloud image editor).
 | **Rule** | An approval gate: a class of actions that requires a decision before it executes. |
 | **Decision** | A running procedure (`approve(circle, N)` or `vote(circle, threshold)`) with a deadline and default outcome. |
 | **Proposal** | A decision whose effect is applying a new spec version. |
-| **Owner** | The account that answers for an org on the platform, initially its creator. It can hand ownership on and appoint successors to people who left or went inactive, and governs nothing else; the spec does. |
 | **Fork** | A new org started from a copy of another org's active spec. Nothing else is copied. |
-| **Treasury** | The org's unearmarked funds account. |
+| **Treasury** | The org's unearmarked funds account; it holds own funds only. |
+| **Own funds** | Money an org's people put in themselves, recorded by an administrator. The platform doesn't see it. |
+| **Outside money** | Pledges and donations from anyone through openmaru; protected by SPEC-05 §8. |
+| **Pledge** | A donor's monthly cap for a goal; charged after the fact for up to 80% of the goal's accepted spend. |
+| **Accepted spend** | Verified spend on tasks accepted by someone other than the worker or its operator. |
+| **Funding tier** | What outside money an org has earned: 0 own funds only, 1 pledges, 2 upfront donations. |
+| **Silent** | No sign-in or other activity for 90 days; a silent person stops counting toward decisions until they return. |
+| **Dormant** | A goal whose stewards were silent for 90 days while it held outside money; unspent outside money is refunded. |
 | **Hold** | A pending ledger transfer reserving funds/budget until posted or voided. |
 | **Provenance tier** | How a spend is known: **verified** (platform-metered or platform-observed), **evidenced** (receipt attached), **attested** (someone's claim). |
 | **Lease** | A time-limited claim on a task by a principal, kept alive by heartbeats. |

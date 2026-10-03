@@ -29,7 +29,8 @@ An `Authorization` header takes precedence over the session cookie: when it is p
 | `GET /orgs/:slug` (org, active version summary, circles with effective holders, goals, member count) | — | C03 |
 | `GET /orgs/:slug/spec` (source, ir, charter, hash, version) · `GET /orgs/:slug/spec/versions[/:n]` | — | C03 |
 | `POST /orgs/:slug/holders/accept`, `POST /orgs/:slug/holders/decline` | S P | C03 |
-| `POST /orgs/:slug/membership` · `DELETE /orgs/:slug/membership` · `POST /orgs/:slug/sponsorships {handle}` | S P | C03 |
+| `POST /orgs/:slug/membership` · `DELETE /orgs/:slug/membership` (leaving; holders and operators too, SPEC-02 §3.6) · `POST /orgs/:slug/sponsorships {handle}` | S P | C03, C07 |
+| `POST /orgs/:slug/forks {slug, source}` → new org (SPEC-02 §3.7) | S P | C07 |
 | `POST /orgs/:slug/proposals {source, base_version, title, rationale}` | S P | C04 |
 | `GET /orgs/:slug/proposals?status=` · `GET /decisions/:id` | — | C04 |
 | `POST /decisions/:id/ballots {choice}` · `POST /decisions/:id/cancel` | S P | C04 |
@@ -61,8 +62,13 @@ An `Authorization` header takes precedence over the session cookie: when it is p
 ### Payments
 | Method & path | Auth | Owner |
 |---|---|---|
-| `POST /orgs/:slug/payments/onboarding` · `GET /orgs/:slug/payments/status` · `GET /orgs/:slug/payments/reconciliation` | S | P01, P03 |
-| `POST /donations/checkout` · `GET /donations/:id/receipt?t=` | — | P02 |
+| `POST /orgs/:slug/payments/onboarding` (also a replacement account, SPEC-05 §8.8) · `GET /orgs/:slug/payments/status` · `GET /orgs/:slug/payments/reconciliation` | S | P01, P03, P05 |
+| `POST /orgs/:slug/contributions {goal_id?, amount_micros, memo}` (own funds, administrators; SPEC-03 §5.6) | S P | G02 |
+| `GET /orgs/:slug/funding` → tier, per-goal conditions, outside money held and cap, liveness clock (SPEC-05 §8.1) | — | P04 |
+| `POST /donations/checkout` · `GET /donations/:id/receipt?t=` | — | P02, P04 |
+| `POST /donations/:id/exit?t=` (during a waiting period, SPEC-05 §8.5) | — | P05 |
+| `POST /pledges/setup {goal_id, monthly_cap_micros, donor_display_name?, donor_public}` → `{setup_url, pledge_id}` · `GET /pledges/:id?t=` · `POST /pledges/:id/cancel?t=` · `POST /pledges/:id/reconfirm?t=` | — (rate-limited like checkout) | P04 |
+| `POST /pledges/:id/move?t= {goal_id}` (to a fork's goal, SPEC-05 §8.9) | — | P05 |
 | `POST /webhooks/stripe` · `POST /webhooks/stripe/connect` (outside `/api/v1`) | signature | P01, P02 |
 
 ### Public read models (cacheable, no auth)
@@ -93,10 +99,11 @@ Choosing between the generic codes: `invalid_request` (400) is a malformed reque
 | `not_found` | 404 | `invalid_request` | 400 |
 | `validation_failed` | 422 | `goal_closed`, `invalid_transition`, `stale_proposal` | 409 |
 | `already_voted`, `decision_closed`, `lease_limit_reached`, `lease_expired` | 409 | `evidence_required`, `exceeds_hold`, `idempotency_conflict` | 409 |
-| `handle_taken`, `slug_taken`, `must_be_removed_by_amendment`, `account_exists` | 409 | `payments_not_enabled`, `agent_not_hosted`, `no_compute_budget` | 409 |
+| `handle_taken`, `slug_taken`, `account_exists`, `exit_not_open` | 409 | `payments_not_enabled`, `agent_not_hosted`, `no_compute_budget` | 409 |
 | `model_not_priced`, `unsupported_feature` | 400 | `provider_credentials_missing` | 424 |
 | `rate_limited` | 429 | `provider_error` | 502 |
-| `gateway_timeout` | 504 | `task_not_in_goal` | 403 |
+| `gateway_timeout` | 504 | `task_not_in_goal`, `operator_unavailable` | 403 |
+| `funding_tier_required`, `outside_money_cap_reached` | 409 | | |
 | `authorization_pending`, `slow_down`, `expired_token` | 400 | `access_denied`, `invalid_grant` | 400 |
 | `not_acceptable` | 406 | `request_timeout` | 408 |
 | `conflict` | 409 | `payload_too_large` | 413 |

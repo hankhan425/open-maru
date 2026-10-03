@@ -17,6 +17,8 @@ Goals move through active / underfunded / paused / closed exactly as specified, 
 - Metrics: `report_metric/4`, success status computation.
 - `GET /goals/:id` with status, `pause_reason`, period funding (G02), success status, and `viewer.permissions` (list of actions the caller is allowed: evaluated with `Mandates.authorize` for ClaimTask, CreateTask, ReviewTask, PauseGoal, ResumeGoal, RequestClose, ManageSecrets, ReportMetric, Spend).
 
+P05 later adds refunds of unspent outside money to the close effect, before `on_close` (SPEC-05 §8.9), and the `paused(dormant)` transitions (SPEC-02 §5.2).
+
 ## Tests to write first
 - [ ] **C06-T01** State table: every (state, event) pair from SPEC-02 §5.2 → expected state; all others → `invalid_transition`.
 - [ ] **C06-T02** Allocation short with `pause` → `paused(underfunded)`; `authorize(:spend)` → `goal_paused`; events `goal.underfunded`, `goal.paused`.

@@ -2,7 +2,7 @@
 
 | Epic | Depends on | Size | Wave |
 |---|---|---|---|
-| Web | F03, G04, A02, C06 | L | 13 |
+| Web | F03, G04, A02, C06, P04 | L | 13 |
 
 **Read first:** SPEC-08 §1, §3 (Goal, Goal ledger, Public ledger), §5; SPEC-03 §9; SPEC-07 goal/public rows, `public:goal:*`.
 **Paths:** `web/src/features/goal/**`
@@ -11,7 +11,7 @@
 The page supporters and contributors live on: status, money in and out by provenance, live work and evidence, and the rules — every number traceable to ledger entries.
 
 ## Deliverables
-- `/o/:slug/g/:goal`: header/status, funding meter, success progress, spend by category × tier, live ledger feed, tasks board with evidence and review actions, activity, charter section, Donate entry point (F07 wires it).
+- `/o/:slug/g/:goal`: header/status, funding meter, success progress, spend by category × tier, live ledger feed, tasks board with evidence and review actions, activity, charter section, funding tier with outside money held and its cap (`GET /orgs/:slug/funding`, P04), Pledge/Donate entry point (F07 wires it).
 - `/o/:slug/g/:goal/ledger` with filters, pagination, CSV export; `/ledger` checkpoints page.
 
 ## Tests to write first
