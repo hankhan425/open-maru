@@ -31,6 +31,8 @@ config :openmaru, Oban,
     {Oban.Plugins.Cron,
      crontab: [
        {"17 * * * *", Openmaru.Accounts.PruneWorker},
+       # Audit IP hash keys past their 30 days (SPEC-09 §7).
+       {"23 * * * *", Openmaru.Audit.IpKeySweeper},
        # Pending-transfer expiry; each run schedules a second one 30 s later (G01).
        {"* * * * *", Openmaru.Ledger.ExpiryWorker}
      ]}
@@ -46,8 +48,8 @@ config :openmaru, Openmaru.Accounts.WebAuthn,
 # OAuth providers are enabled by a client_id (config/runtime.exs reads them from env).
 config :openmaru, Openmaru.Accounts.OAuth, providers: [github: [], google: []]
 
-# Key for the audit log's IP hash (Openmaru.Audit); AUDIT_IP_HASH_KEY in prod.
-config :openmaru, Openmaru.Audit, ip_hash_key: "dev-only audit ip hash key"
+# Seals the audit log's daily IP hash keys (Openmaru.Audit); AUDIT_IP_HASH_KEY in prod.
+config :openmaru, Openmaru.Audit, ip_key_wrapping_key: "dev-only audit ip key wrapping key"
 
 # SPEC-09 §6 rate limits per bucket; config/runtime.exs can override them per environment.
 config :openmaru, OpenmaruWeb.Plugs.RateLimit, limits: [auth: [limit: 10, scale_ms: 60_000]]

@@ -4,7 +4,8 @@
 
 - Double-entry, single asset in MVP: **ledger 1 = USD in micro-dollars** (1 USD = 1_000_000).
 - Modeled on TigerBeetle (ADR-1): two tables (accounts, transfers), fixed fields, integer amounts, immutable transfers, client-generated IDs, two-phase transfers, linked chains, balance-constraint flags, balancing transfers. Only `Openmaru.Ledger` touches these tables.
-- The ledger is an **earmarking and accounting mirror**. Real money sits in the org's Stripe account (ADR-2). Reconciliation (SPEC-05 §6) proves the mirror matches.
+- The ledger is an **earmarking and accounting mirror**. Real money sits in the org's Stripe account (ADR-2), or, for own funds, wherever the org keeps it. Reconciliation (SPEC-05 §6) proves the Stripe part of the mirror matches.
+- Money enters as **own funds** (§5.6: the org's own statement; the platform sees no money) or as **outside money** (donations, §5.5, and pledge charges, §5.7). Which money a spend used, outside money first, is tracked by SPEC-05 §8.4's lots, not by separate ledger accounts.
 - Descriptive metadata (memos, models, receipts) lives in `spend_records` and other control-plane tables keyed by transfer IDs, never in ledger rows.
 
 ## 2. Tables
@@ -57,23 +58,26 @@ Triggers reject UPDATE and DELETE. A partial unique index on `pending_id` (for r
 
 | Account code | Key pattern | Flags | Purpose |
 |---|---|---|---|
-| 100 | `org:<id>:ext_donations` | none | Source of donations (goes debit-heavy) |
+| 100 | `org:<id>:ext_donations` | none | Source of donations and pledge charges (goes debit-heavy) |
+| 101 | `org:<id>:ext_own` | none | Source of own funds (goes debit-heavy) |
 | 110 | `org:<id>:ext_refunds` | none | Sink for refunds |
 | 200 | `org:<id>:treasury` | DMNEC | Unearmarked funds |
-| 210 | `org:<id>:fees_stripe`, `org:<id>:fees_platform` | none | Fees on treasury donations |
+| 210 | `org:<id>:fees_stripe`, `org:<id>:fees_platform` | none | Org-level fees (donations name a goal, so their fees go to the goal's 400 accounts) |
 | 300 | `goal:<id>:funds` | DMNEC | Goal's available funds |
+| 310 | `goal:<id>:reimbursed` | none | Pledge charges paying back accepted spend; never funds spend |
 | 400 | `goal:<id>:spend:<category>` for `llm, compute, expense, fees_stripe, fees_platform` | none | Consumption sinks |
 | 500 | `mandate:<id>:budget:<category>` | DMNEC | Period allowance |
 | 600 | `system:allowance_source` | none | Source of allowance grants |
 | 610 | `system:allowance_sink` | none | Sink of consumed/reset allowance |
 
-Accounts are created with their owner: org creation creates 100, 110, 200, 210×2; goal adoption creates 300 and 400×5; mandate creation creates one 500 per spend category (new categories later create new accounts). System accounts are created by a migration, with id = `uuidv5(key)` (`13a8b848-795e-5365-8aab-dcb51235c51d` for 600, `3dd63a3b-7c4c-520f-ae03-92e4f528ac2a` for 610).
+Accounts are created with their owner: org creation creates 100, 101, 110, 200, 210×2; goal adoption creates 300, 310 and 400×5; mandate creation creates one 500 per spend category (new categories later create new accounts). System accounts are created by a migration, with id = `uuidv5(key)` (`13a8b848-795e-5365-8aab-dcb51235c51d` for 600, `3dd63a3b-7c4c-520f-ae03-92e4f528ac2a` for 610).
 
 `create_accounts/1` returns one result per account, like `create_transfers/1`: `{:ok, :created}`, `{:ok, :exists}` (same id, identical `key`, `ledger`, `code`, `flags`), or `{:error, code}` checked in this order: `id_must_not_be_zero` · `exists_with_different_fields` · `flags_are_mutually_exclusive` (both balance flags) · `ledger_must_not_be_zero` · `code_must_not_be_zero` · `key_must_not_be_empty` · `key_exists` (another id holds the key).
 
 | Transfer code | Meaning |
 |---|---|
 | 1 donation · 2 fee_stripe · 3 fee_platform · 4 refund | Stripe flows |
+| 5 own_contribution · 6 pledge_reimbursement | Own funds (§5.6) · pledge charges (§5.7) |
 | 10 allocation · 11 close_disposition | Treasury ↔ goal |
 | 20 spend_llm · 21 spend_compute · 22 spend_expense | Goal consumption |
 | 30 budget_grant · 31 budget_consume · 32 budget_reset | Allowance |
@@ -132,10 +136,16 @@ On mandate creation or limit change mid-period: reset, then grant `max(new_limit
 - Top-up: after any credit to a treasury, for goals of that org with shortfall > 0 in their current period, ordered by adoption time: balancing transfer for the shortfall; update the allocation row; fully covered goals return to `active`.
 
 ### 5.4 Closing a goal
-After voiding holds: `goal:<g>:funds` → `org:<o>:treasury` (or `goal:<other>:funds` for `transfer`), `balancing_debit`, requested = i64 max, code 11, id `uuidv5("close:<g>")`.
+After voiding holds and refunding the goal's unspent outside money (SPEC-05 §8.9): `goal:<g>:funds` → `org:<o>:treasury` (or `goal:<other>:funds` for `transfer`), `balancing_debit`, requested = i64 max, code 11, id `uuidv5("close:<g>")`.
 
 ### 5.5 Donations, fees, refunds
-See SPEC-05 §4. Linked chain: `ext_donations` → destination (goal funds or treasury), code 1, gross; destination → fee account, code 2; destination → fee account, code 3. IDs `uuidv5("donation:<charge_id>")`, `uuidv5("fee_stripe:<charge_id>")`, `uuidv5("fee_platform:<charge_id>")`. Refund: destination → `ext_refunds`, code 4, id `uuidv5("refund:<refund_id>")`; if it fails with `exceeds_credits`, retry from treasury; if that fails, mark the donation `refund_unfunded` and alert stewards.
+See SPEC-05 §4. Linked chain: `ext_donations` → destination (goal funds; donations always name a goal), code 1, gross; destination → fee account, code 2; destination → fee account, code 3. IDs `uuidv5("donation:<charge_id>")`, `uuidv5("fee_stripe:<charge_id>")`, `uuidv5("fee_platform:<charge_id>")`. Refund: destination → `ext_refunds`, code 4, id `uuidv5("refund:<refund_id>")`; if it fails with `exceeds_credits`, retry from treasury; if that fails, mark the donation `refund_unfunded` and alert stewards.
+
+### 5.6 Own funds
+An administrator records money the org puts in itself (`POST /orgs/:slug/contributions {goal_id?, amount_micros, memo}`): `org:<o>:ext_own` → `goal:<g>:funds`, or the treasury when no goal is named, code 5, id `uuidv5("contribution:<contribution_id>")`, `user_data_128 = contribution_id`. It is the org's own statement, shown publicly as `attested`: the platform sees no money. It makes the org's own budget spendable (its model and compute bills go to its own provider keys, SPEC-06 §1). A treasury credit triggers top-ups (§5.3).
+
+### 5.7 Pledge charges
+A pledge charge (SPEC-05 §8.3) pays back accepted spend that has already happened. Linked chain: `org:<o>:ext_donations` → `goal:<g>:reimbursed`, gross, code 6, id `uuidv5("pledge_charge:<charge_id>")`; then `goal:<g>:reimbursed` → `goal:<g>:spend:fees_stripe` (code 2) and → `goal:<g>:spend:fees_platform` (code 3), omitted when 0. Nothing moves out of `reimbursed` otherwise, so pledge money never funds future spend. Refunds of pledge charges: `reimbursed` → `ext_refunds`, code 4.
 
 ## 6. Spend records and provenance
 
@@ -170,4 +180,4 @@ Status transitions: `pending_approval → held | denied`; `held → posted | voi
 
 ## 9. Public read models
 
-Per goal: current period `{allocated, held, spent, available, shortfall}`; totals by category, tier, and source; daily series (90 days); paginated entries `{spend_id, occurred_at, principal, category, tier, amount, memo, model/tokens, task link}`. Receipts, reimbursement proofs, and donor identities are never public.
+Per goal: current period `{allocated, held, spent, available, shortfall}`; outside money held and its cap, and pledge charges by month (SPEC-05 §8); totals by category, tier, and source; daily series (90 days); paginated entries `{spend_id, occurred_at, principal, category, tier, amount, memo, model/tokens, task link}`. Receipts, reimbursement proofs, and donor identities are never public.

@@ -32,13 +32,13 @@ Provenance badges: **verified** `●` solid ink · **evidenced** `◐` half · *
 |---|---|---|---|
 | `/` | World | PixiJS canvas: orgs as drifting nodes sized by `sqrt(members)`, goals as satellites sized by monthly funding, shared-member edges, live pulses on spend/donation. Search, legend toggles, theme switch, list-view fallback. Sign-in card overlay (as in prototype). | F02 |
 | `/signin`, `/device` | Auth | Passkey, GitHub, Google (no email in the MVP, OQ-8); first-login handle picker; device-code approval | F01 |
-| `/o/:slug` | Org | Name, purpose, **How it's governed** with `Charter / Source` toggle, circles (holders, vacancies, pending acceptances), goals with funding bars and status, membership action (join / request sponsorship), related (shared members) | F03 |
+| `/o/:slug` | Org | Name, purpose, **How it's governed** with `Charter / Source` toggle, circles (holders, vacancies, pending acceptances, departed holders marked), goals with funding bars and status, membership action (join / request sponsorship / leave, listing what ends), funding tier, **Fork** and the forks made by members, "forked from" link, dormancy records, related (shared members) | F03, C07 |
 | `/o/:slug/edit` | Spec editor | CodeMirror 6 with maru highlighting, live diagnostics from WASM (≤ 50 ms debounce), charter preview, diff vs active version with loosens/tightens markers and limits change, `Propose change` (title, rationale) | F04 |
 | `/o/:slug/proposals`, `/decisions/:id`, `/inbox` | Decisions | Proposal diff + charter delta; spend decision details; ballots, required count, countdown; approve/reject; holder acceptance items | F05 |
-| `/o/:slug/g/:goal` | Goal | Status, period funding meter (allocated/spent/held/available), success metric progress, spend by category and tier, live ledger feed, tasks board (open/claimed/review/done), evidence, activity, the goal's charter section, **Donate** | F06 |
+| `/o/:slug/g/:goal` | Goal | Status, period funding meter (allocated/spent/held/available), success metric progress, spend by category and tier, live ledger feed, tasks board (open/claimed/review/done), evidence, activity, the goal's charter section, **Pledge** / **Donate** (as the tier allows), outside money held and its cap, liveness warnings, a scheduled change with its activation date and the donor-exit link | F06, P05 |
 | `/o/:slug/g/:goal/ledger` | Goal ledger | Filterable, paginated entries; CSV export; link to checkpoints | F06 |
-| `/donate/...`, `/donations/:id/thanks` | Donation | Amount presets, monthly toggle, public-name opt-in, Stripe Checkout redirect; receipt with fee breakdown and "where it went" | F07 |
-| `/o/:slug/settings` | Settings | Payments onboarding/status, reconciliation status (admins); goal secrets (write-only); agents, mandates, tokens (mint shows once with copy + setup snippet for Claude Code / OpenAI SDK / MCP), sessions, **Pause goal** and **Stop agent** with confirmation | F07, F08 |
+| `/donate/...`, `/donations/:id/thanks`, `/pledges/:id` | Giving | Pledge (monthly cap, explained as "you pay for accepted work, up to this") or, at tier 2, donation (presets, monthly toggle); public-name opt-in; Stripe Checkout redirect; receipt with fee breakdown and "where it went"; pledge page with charges and the tasks they paid for, cancel, reconfirm, move to a fork; exit during a waiting period | F07, P05 |
+| `/o/:slug/settings` | Settings | Own funds (record a contribution), payments onboarding/status and replacement account, reconciliation status (admins); goal secrets (write-only); agents, mandates, tokens (mint shows once with copy + setup snippet for Claude Code / OpenAI SDK / MCP), sessions, **Pause goal** and **Stop agent** with confirmation | F07, F08 |
 | `/new` | Create org | Starter template in the editor, slug picker, create | F04 |
 | `/ledger` | Public ledger | Checkpoints list, verify instructions | F06 |
 
@@ -49,6 +49,7 @@ Provenance badges: **verified** `●` solid ink · **evidenced** `◐` half · *
 - `web/src/lib/maru` wraps the WASM package: `check`, `format`, `render`, `diff`; loaded lazily on the editor route only.
 - Canvas logic (layout, physics, hit-testing, camera) lives in pure TS modules under `features/world/sim/` and is unit-tested without Pixi; the Pixi layer only draws.
 - Money formatting matches the charter helpers exactly (shared test vectors from SPEC-01 §8).
+- Charter strings (the headings, paragraphs and bullets of the structured charter, SPEC-01 §8) are Markdown inline text. They render through one component, `MarkdownInline`, as **CommonMark inline content only**: raw HTML off, no GFM extensions (bare URLs and `www.` are not linked, no strikethrough or tables), no typographic replacements (OQ-12). Use markdown-it's `commonmark` preset with `html: false` and `renderInline`, or an equivalent. SPEC-01 §8 escapes spec text for exactly this renderer, so a name, title or purpose renders literally and cannot add a link, image or HTML. No other API text goes through this component.
 - Routes are code-split; world canvas and editor are separate chunks.
 
 ## 5. Quality bars

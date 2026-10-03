@@ -92,7 +92,7 @@ Parsing is error-tolerant: on a syntax error inside a block, the parser skips to
   - `open()`: any signed-in user may join.
   - `invite(sponsors: N)`: a user becomes a member once N distinct existing members sponsor them. N ≥ 1.
 - `amend` **required** (E304). Governs every change to this spec. Default timeout `within 7d else deny`.
-- Circle holders and agent operators are members implicitly.
+- Circle holders and agent operators are members implicitly. Anyone may leave, holders and operators included, which ends their seats and operator roles (SPEC-02 §3.6).
 
 ### 4.2 Circles
 - `seats` required, ≥ 1. `holders` optional, ≤ seats (E306), no duplicates (E323).
@@ -129,8 +129,10 @@ Parsing is error-tolerant: on a syntax error inside a block, the parser skips to
 
 ### 4.7 Decision procedures
 - `approve(C, N)`: passes when N distinct effective holders of circle C approve. Fails early when rejections make N approvals impossible. `members` not allowed (E322). 1 ≤ N ≤ seats(C) (E307).
-- `vote(C | members, T)`: eligible voters are snapshotted at decision creation (effective holders of C, or all members). Passes when yes votes ≥ ceil(T × eligible). Fails early when no votes > eligible − required.
-- Timeout: at deadline, an undecided procedure resolves to the `else` outcome.
+- `vote(C, T)`: eligible voters are the effective holders of C, snapshotted when the decision opens. Passes when yes votes ≥ ceil(T × eligible); a holder who doesn't vote counts against it. Fails early when no votes > eligible − required.
+- `vote(members, T)`: eligible voters, snapshotted when the decision opens, are the members who joined at least 30 days earlier and are not silent or suspended (SPEC-02 §3.4). The vote counts only when at least 20% of them vote, yes or no; it then passes when yes votes ≥ ceil(T × votes cast). Members who don't vote don't count against it. It ends early only once the outcome can no longer change (SPEC-02 §4.2), and is otherwise decided at the deadline (OQ-16).
+- Timeout: at deadline, an undecided procedure resolves to the `else` outcome. A member-wide vote that did not reach 20% turnout is undecided.
+- 20% and 30 days are platform rules, not settings. Who counts as an effective holder, and what happens to a decision when people have left or gone silent, is SPEC-02 §3.4 and §4.1.
 
 ### 4.8 Money, time, periods
 - Money is integer micro-USD. `usd 12.50` = 12_500_000. Max per literal 9_007_199_254_740_991 micros (E310). Must be > 0 (E309).
@@ -298,7 +300,7 @@ Deterministic IR → Markdown. Never uses an LLM. Structure and exact sentences 
 
 **Templates**
 - Membership: `Anyone signed in to openmaru can join.` / `New members join when N existing member(s) sponsor(s) them.` (N=1: "member sponsors"; N>1: "members sponsor").
-- Amend — vote: `Changes need a vote of <C>, passing with at least <T> of its holders in favour within <D>.`; vote members: `Changes need a vote of all members, passing with at least <T> of them in favour within <D>.`; approve: `Changes need approval from <N> holder(s) of <C> within <D>.` Then `If the vote does not pass in time, the change is rejected.` (vote/deny), `If not approved in time, the change is rejected.` (approve/deny), `If not decided in time, the change is applied.` (allow).
+- Amend — vote: `Changes need a vote of <C>, passing with at least <T> of its holders in favour within <D>.`; vote members: `Changes need a vote of all members in which at least 20% vote, passing with at least <T> of the votes cast in favour within <D>.`; approve: `Changes need approval from <N> holder(s) of <C> within <D>.` Then `If the vote does not pass in time, the change is rejected.` (vote/deny), `If not approved in time, the change is rejected.` (approve/deny), `If not decided in time, the change is applied.` (allow).
 - Circle: `- **<id>**: <S> seat(s), each held for <term>.` or `- **<id>**: <S> seat(s) with no term limit.` then ` Holders: <handles joined by ", ", or none>.` then vacancy ` 1 seat is vacant.` / ` K seats are vacant.` (omitted when 0).
 - Agent: `- **<id>** is an AI agent operated by @<op>, running on the hosted runtime.` / `…, running on its operator's own infrastructure.`
 - Goal bullets in order: `Stewarded by <C>.`; funding (see below); closure; success (if any).
@@ -307,12 +309,12 @@ Deterministic IR → Markdown. Never uses an LLM. Structure and exact sentences 
 - Success: `Success means <metric> reaches <at least|more than|at most|less than|exactly> <value with thousands separators>[ by <date>].`
 - Mandate: `- **<id or @handle>** may spend up to <$X> per <period> on <AI models|compute|expenses>[ and up to …][, at most <$Y> per request].` Spend clauses are joined with the list helper, in source order (`up to $5 per day on expenses, up to $100 per month on AI models, and up to $20 per week on compute`). If no spend lines: `- **<p>** may not spend funds.` Then ` <It|They> may <capability list>.` (omitted if none; phrases: `claim tasks`, `create tasks`, `post evidence`, `report <metric>`). Then ` This mandate expires on <date>.` if set.
 - Rule subject: `Any spend`, `Any spend over $X`, `Any AI-model spend[ over $X]`, `Any compute spend[ over $X]`, `Any expense[ over $X]`, `Closing this goal`.
-- Rule: `- <subject> needs <approval from N holder(s) of C | a vote of C, passing with at least T of its holders in favour | a vote of all members, passing with at least T of them in favour> within <D>; otherwise <outcome>.` Outcome: spend deny `it is denied`, spend allow `it is allowed`, close deny `it stays open`, close allow `it is closed`.
+- Rule: `- <subject> needs <approval from N holder(s) of C | a vote of C, passing with at least T of its holders in favour | a vote of all members in which at least 20% vote, passing with at least T of the votes cast in favour> within <D>; otherwise <outcome>.` Outcome: spend deny `it is denied`, spend allow `it is allowed`, close deny `it stays open`, close allow `it is closed`.
 - Limits: `Without any approval, at most <$X> per month can be spent on this goal.`; zero while some mandate has a spend line: `Nothing can be spent on this goal without approval.`; no spend lines at all: `No one may spend from this goal.`
 
 **Text from the spec** (the org name, goal titles, purposes, ids, handles and metric names) is written on one line and renders literally, so it cannot add a heading, list or link to the charter. Each run of whitespace, line breaks included, becomes one space, and the text is trimmed. A backslash goes before `\`, `` ` ``, `*`, `[`, `]` and `~`; before `_` unless it is between two letters or digits; before `<` followed by a letter, `/`, `!` or `?`; and before `&` that starts an entity (`&amp;`, `&#35;`). It also goes before a block marker at the start of the text (`#`; `>`; `-` before a space, `-` or the end; `+` before a space or the end; the `.` or `)` after 1–9 leading digits, as in `1. `), and before the first `#` of a closing run at the end (`Lumen #`). A purpose that is empty after trimming has no paragraph; an empty heading is a bare `#`.
 
-The renderer also returns a structured form for the web UI: `[{"section": "…", "level": 2, "paragraphs": ["…"], "bullets": ["…"]}]`. `section` is the heading text and `level` its Markdown level (1 for the org, 2 for org-level sections and goals, 3 within a goal). Paragraphs come before bullets, and bullets have no `- ` marker. Every string is Markdown inline text (`**bold**` ids, escaped spec text). The Markdown charter is built from this form: each heading, paragraph and bullet list is one block, blocks are separated by one blank line, and the file ends with one newline.
+The renderer also returns a structured form for the web UI: `[{"section": "…", "level": 2, "paragraphs": ["…"], "bullets": ["…"]}]`. `section` is the heading text and `level` its Markdown level (1 for the org, 2 for org-level sections and goals, 3 within a goal). Paragraphs come before bullets, and bullets have no `- ` marker. Every string is Markdown inline text (`**bold**` ids, escaped spec text). The escaping is written for a CommonMark renderer of inline content with raw HTML and extensions off (no autolinking of bare URLs); a renderer with GFM's autolinks would turn a URL in a purpose into a link, so SPEC-08 §4 pins the web's renderer (OQ-12). The Markdown charter is built from this form: each heading, paragraph and bullet list is one block, blocks are separated by one blank line, and the file ends with one newline.
 
 ## 9. Semantic diff
 

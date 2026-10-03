@@ -57,10 +57,10 @@ defmodule Openmaru.RuntimeConfigTest do
     end
   end
 
-  test "C01-T18 production hashes audit IPs with AUDIT_IP_HASH_KEY, not SECRET_KEY_BASE" do
+  test "C01-T18 production seals audit IP hash keys with AUDIT_IP_HASH_KEY, not SECRET_KEY_BASE" do
     config = prod_config(%{})
 
-    assert config[:openmaru][Openmaru.Audit][:ip_hash_key] == String.duplicate("k", 32)
+    assert config[:openmaru][Openmaru.Audit][:ip_key_wrapping_key] == String.duplicate("k", 32)
 
     assert_raise RuntimeError, ~r/AUDIT_IP_HASH_KEY is missing/, fn ->
       prod_config(%{"AUDIT_IP_HASH_KEY" => nil})

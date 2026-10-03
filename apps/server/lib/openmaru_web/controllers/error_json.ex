@@ -28,12 +28,22 @@ defmodule OpenmaruWeb.ErrorJSON do
     error(Error.new(code_for_status(status), message))
   end
 
+  # Each status raised outside a controller has a code that maps back to that same status
+  # (SPEC-07 §2, OQ-1). A test checks every status the dependencies' exceptions carry; the
+  # last two clauses only catch a status a future dependency adds.
   defp code_for_status(400), do: :invalid_request
   defp code_for_status(401), do: :unauthenticated
   defp code_for_status(403), do: :forbidden
   defp code_for_status(404), do: :not_found
+  defp code_for_status(406), do: :not_acceptable
+  defp code_for_status(408), do: :request_timeout
+  defp code_for_status(409), do: :conflict
+  defp code_for_status(413), do: :payload_too_large
+  defp code_for_status(414), do: :uri_too_long
+  defp code_for_status(415), do: :unsupported_media_type
   defp code_for_status(422), do: :validation_failed
   defp code_for_status(429), do: :rate_limited
+  defp code_for_status(503), do: :service_unavailable
   defp code_for_status(status) when status < 500, do: :invalid_request
   defp code_for_status(_status), do: :internal_error
 end

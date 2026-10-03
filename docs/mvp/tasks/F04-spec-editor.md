@@ -11,7 +11,7 @@
 Writing rules feels like a good IDE: instant diagnostics, a live charter, and a plain-English diff of what the change does before proposing it.
 
 ## Deliverables
-- CodeMirror 6 editor with a maru `StreamLanguage` (or Lezer) mode, lint source backed by WASM `check`, format command, charter preview, Diff tab (loosens/tightens/neutral markers + limits change), Propose form.
+- CodeMirror 6 editor with a maru `StreamLanguage` (or Lezer) mode, lint source backed by WASM `check`, format command, charter preview (strings through `MarkdownInline`, SPEC-08 §4), Diff tab (loosens/tightens/neutral markers + limits change), Propose form.
 - Lazy WASM loading on editor routes only.
 - `/new` create-org flow with starter template and slug check.
 

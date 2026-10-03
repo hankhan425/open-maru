@@ -8,13 +8,13 @@
 **Paths:** `lib/openmaru/payments/donations/**`, controllers, migrations
 
 ## Goal
-Donors give once or monthly to a goal or treasury via Stripe Checkout on the org's own account; every cent (gross, fees, refunds) is mirrored in the ledger exactly once.
+Donors give once or monthly to a goal via Stripe Checkout on the org's own account; every cent (gross, fees, refunds) is mirrored in the ledger exactly once.
 
 ## Deliverables
 - Migration `donations`.
 - `Openmaru.Payments.Donations`: `checkout/1`, webhook handlers for every event in SPEC-05 §4.2 except `account.updated`, `receipt/2`.
 - Ledger chains with deterministic ids; fee `spend_records` (source `stripe`, tier `verified`); treasury credits trigger `Funding.top_up/1`.
-- Endpoints `POST /donations/checkout` (rate-limited), `GET /donations/:id/receipt?t=`.
+- Endpoints `POST /donations/checkout` (rate-limited), `GET /donations/:id/receipt?t=`. A donation always names a goal (SPEC-05 §8.4). P04 later gates checkout by funding tier and cap.
 - Administrator alerts (inbox item + `members` activity) for disputes and `refund_unfunded`.
 
 ## Tests to write first
@@ -23,7 +23,7 @@ Donors give once or monthly to a goal or treasury via Stripe Checkout on the org
 - [ ] **P02-T03** Monthly session: `mode=subscription`, monthly recurring price, `application_fee_percent`, subscription metadata.
 - [ ] **P02-T04** `checkout.session.completed` → PaymentIntent retrieved with `latest_charge.balance_transaction`; fees from `fee_details`; donation `succeeded`; 3 linked transfers with deterministic ids; 2 fee spend records; `donation.received`.
 - [ ] **P02-T05** Replayed webhook → no new transfers (`:exists`).
-- [ ] **P02-T06** Treasury donation → treasury credited, top-up invoked.
+- [ ] **P02-T06** A checkout without a goal, or naming the treasury → 422: the treasury takes no outside money.
 - [ ] **P02-T07** `invoice.paid`: first invoice completes the original donation; the next creates a child with `parent_donation_id`.
 - [ ] **P02-T08** Partial then full refund → per-refund transfers; status `partially_refunded` then `refunded`; `refunded_micros` correct.
 - [ ] **P02-T09** Refund when goal funds are spent → falls back to treasury; both insufficient → `refund_unfunded` + alert, no transfer.
@@ -34,4 +34,4 @@ Donors give once or monthly to a goal or treasury via Stripe Checkout on the org
 - [ ] **P02-T14** 11th checkout within a minute from one IP → 429.
 
 ## Out of scope
-Reconciliation (P03), donation UI (F07).
+Reconciliation (P03), donation UI (F07), funding tiers, caps and pledges (P04), donor protections (P05).
