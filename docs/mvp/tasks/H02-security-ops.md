@@ -2,7 +2,7 @@
 
 | Epic | Depends on | Size | Wave |
 |---|---|---|---|
-| Hardening | A06, G04, P03, W03, C07, P05 | M | 15 |
+| Hardening | A06, G04, P03, W03, C07, P05, P06 | M | 15 |
 
 **Read first:** SPEC-09 (all); ARCHITECTURE §7; CONVENTIONS §6.
 **Paths:** `apps/server/lib/openmaru_web/{endpoint,router}.ex`, plugs, `lib/openmaru/admin/**`, `Dockerfile`, `rel/`, `docs/ops/`

@@ -11,7 +11,7 @@
 The page supporters and contributors live on: status, money in and out by provenance, live work and evidence, and the rules — every number traceable to ledger entries.
 
 ## Deliverables
-- `/o/:slug/g/:goal`: header/status, funding meter, success progress, spend by category × tier, live ledger feed, tasks board with evidence and review actions, activity, charter section, funding tier with outside money held and its cap (`GET /orgs/:slug/funding`, P04), Pledge/Donate entry point (F07 wires it).
+- `/o/:slug/g/:goal`: header/status, funding meter, success progress, spend by category × tier, live ledger feed, tasks board with evidence and review actions, activity, charter section, whether the goal takes pledges and donations (or why not), unspent outside money and its cap, and the margin (`GET /orgs/:slug/funding`, P04), Pledge/Donate entry point (F07 wires it).
 - `/o/:slug/g/:goal/ledger` with filters, pagination, CSV export; `/ledger` checkpoints page.
 
 ## Tests to write first

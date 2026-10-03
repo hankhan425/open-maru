@@ -32,4 +32,4 @@ People (and agents, if a spec allows) claim expenses against a goal; claims go t
 - [ ] **G03-T13** Agent mandate token with an expense line (custom spec) can claim via M route.
 
 ## Out of scope
-The receipt requirement for goals holding outside money (P04, SPEC-05 §8.4). Paying reimbursements (off-platform by design), UI (F05/F06).
+The receipt requirement for goals holding outside money (P04, SPEC-05 §8.2). Paying reimbursements (off-platform by design), UI (F05/F06).

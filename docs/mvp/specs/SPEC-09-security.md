@@ -23,7 +23,8 @@
 |---|---|
 | Specs, charters, versions, decisions, ballots (who voted how) | public |
 | Goals, tasks, evidence URLs/summaries, ledger entries, activity | public |
-| Receipts, reimbursement proofs, file evidence marked private | members only (presigned GET, 5-minute expiry) |
+| Receipts, reimbursement and payout proofs, file evidence marked private | members only (presigned GET, 5-minute expiry) |
+| Pay rules, amounts owed and paid, who recorded a payment | public |
 | Donor identity | private unless the donor opts in (display name only) |
 | Emails | private; never in public payloads |
 | Mandate token metadata | members only |
@@ -38,7 +39,7 @@ Presigned PUT to private bucket; max 10 MB; allowed types: `application/pdf`, `i
 - Client IP: "IP" means an IPv4 address or an IPv6 /64. Behind a load balancer, `x-forwarded-for` is believed only when the TCP peer is a configured trusted proxy (`TRUSTED_PROXIES`); the client is the right-most hop that is not a trusted proxy. With none configured, the header is ignored.
 - Holder consent (SPEC-02 §3.2) prevents unconsented association.
 - Joining to sway a vote: member-wide votes count only members of at least 30 days (SPEC-01 §4.7). People silent for 90 days and suspended users don't count toward decisions (SPEC-02 §3.4).
-- Outside money is protected by funding tiers, caps, waiting periods and dormancy (SPEC-05 §8). No one grants a funding tier by hand in production.
+- Outside money is protected by an honest meter, earmarked lots, a cap, a waiting period and dormancy refunds (SPEC-05 §8). Usage reported by a custom `openai_base_url` is `attested`, and such calls are refused while a goal holds unspent outside money, so a server an org controls cannot fake `verified` spend (SPEC-05 §8.2). Platform admins cannot raise a cap or lift a refusal by hand.
 - Platform admins can suspend orgs (read-only public page with a notice, all spend denied `forbidden`, checkout and pledge charges disabled) and users (who then stop counting toward decisions, and whose agents are refused with `operator_unavailable`).
 - Webhooks verify Stripe signatures and tolerance window (5 min).
 

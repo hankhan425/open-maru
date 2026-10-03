@@ -46,4 +46,4 @@ Nobody is locked into an org, and no org is locked by someone who has gone. Anyo
 - [ ] **C07-T12** Web: the leave dialog lists what ends; departed holders are marked; Fork opens the editor with the source and creates the org; axe reports no violations.
 
 ## Out of scope
-Outside-money protections when people go silent: dormancy, payments continuity, pledges following a fork (P05). Account deletion itself (H02).
+Outside-money protections: liveness and dormancy, payments continuity when the Stripe connector is gone (P05). Pay rules skipping silent or departed payees (P06). Account deletion itself (H02).

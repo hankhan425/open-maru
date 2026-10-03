@@ -12,10 +12,10 @@ Orgs exist as versioned, content-addressed specs. Activating a version projects 
 
 ## Deliverables
 - Migrations: `orgs`, `memberships`, `sponsorships`, `spec_versions`, `circles`, `circle_holders`, `agents`, `goals`, `mandates` (status and terms only; tokens in M01).
-- `Openmaru.Orgs`: `check_source/2` (Lang check + server validation E501/E502/E504), `create_org/3`, `activate_version/3` (used by C04), `active_version/1`, `effective_holders/2`, `administrators/1` (SPEC-05 §2; P01 and G02 use it), `accept_holder/2`, `decline_holder/2`, `join/2`, `sponsor/3`, `leave/2` (membership and seats; C07 adds the rest of SPEC-02 §3.6), `world/0`.
+- `Openmaru.Orgs`: `check_source/2` (Lang check + server validation E501/E502/E504/E505), `create_org/3`, `activate_version/3` (used by C04), `active_version/1`, `effective_holders/2`, `administrators/1` (SPEC-05 §2; P01 and G02 use it), `accept_holder/2`, `decline_holder/2`, `join/2`, `sponsor/3`, `leave/2` (membership and seats; C07 adds the rest of SPEC-02 §3.6), `world/0`.
 - **Projection** per SPEC-02 §3.3 returning a change summary `%{goals_adopted, goals_removed, mandates_created, mandates_changed (with before/after terms), mandates_revoked, agents_removed, holders_added, holders_removed}`.
 - **Projection hooks**: `config :openmaru, :projection_hooks, [Module…]`; each `c:run(multi, org, version, summary) :: Ecto.Multi.t()` executes inside the activation transaction. Ship an empty default list.
-- Org ledger accounts created at org creation via `Openmaru.Ledger` (codes 100, 101, 110, 200, 210×2).
+- Org ledger accounts created at org creation via `Openmaru.Ledger` (codes 100, 101, 110, 120, 200, 210×2, 220, 230).
 - Daily Oban job emitting `holder.lapsed` for terms ending that day.
 - Endpoints per SPEC-07 (owner C03), including `POST /specs/check` and `GET /public/world` (shared-member edge weight = count of shared active members).
 
@@ -32,7 +32,7 @@ Orgs exist as versioned, content-addressed specs. Activating a version projects 
 - [ ] **C03-T10** Projection: changed mandate keeps its id with new `terms`; removed mandate → `revoked`; removed agent → `active=false`.
 - [ ] **C03-T11** Change summary contents for a version that adds a goal, changes a mandate, and revokes another.
 - [ ] **C03-T12** Hooks run inside the transaction: a test hook records calls; a failing hook rolls back the whole activation (no version, no events).
-- [ ] **C03-T13** Org creation creates the six org ledger accounts with the right codes and flags.
+- [ ] **C03-T13** Org creation creates the nine org ledger accounts with the right codes and flags (SPEC-03 §3).
 - [ ] **C03-T14** `GET /orgs/:slug` returns circles with effective and pending holders, goals summary, member count; `GET /orgs/:slug/spec` and `/spec/versions[/:n]`; unknown → 404.
 - [ ] **C03-T15** `open()` join → `member.joined`; joining twice is idempotent.
 - [ ] **C03-T16** `invite(sponsors: 2)`: one sponsor → not a member; second distinct sponsor → member; self-sponsor → 403; non-member sponsor → 403.
@@ -40,6 +40,7 @@ Orgs exist as versioned, content-addressed specs. Activating a version projects 
 - [ ] **C03-T18** `GET /public/world`: two orgs sharing two members → one edge with weight 2; goal summaries included.
 - [ ] **C03-T19** Suspended org shows `status: suspended`; suspended user cannot create orgs (403).
 - [ ] **C03-T21** `administrators/1`: effective holders of the `amend` circle; with `amend: vote(members, …)`, every effective holder of any circle.
+- [ ] **C03-T22** E505: a genesis source whose `pay` names a user who isn't the creator, a listed holder or an operator → 422 with E505 on that handle; naming the creator passes. On a later version, a pay rule for a non-member → E505 (SPEC-01 §4.9).
 - [ ] **C03-T20** Architecture test: only `Openmaru.Lang` references `Openmaru.Lang.Native` (xref).
 
 ## Out of scope

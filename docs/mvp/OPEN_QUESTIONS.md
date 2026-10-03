@@ -413,7 +413,7 @@ ARCHITECTURE > PRD.
   (now on an IR edited after checking).
 
 ### OQ-16: People who leave or go silent, and protecting other people's money
-- **Task:** review of OQ-7 (affects C03, C04, C06, G02, M02, P01, P02, H01, H02; new tasks C07, P04, P05)
+- **Task:** review of OQ-7 (affects C03, C04, C06, G02, G03, M02, P01, P02, W03, F06, F07, H01, H02; new tasks C07, L09, P04, P05, P06)
 - **Status:** resolved
 - **Conflict:** OQ-7 kept a deleted user's handle but did not say what happens to that user's
   roles in the orgs they belong to.
@@ -446,8 +446,9 @@ ARCHITECTURE > PRD.
      (SPEC-02 §3.6). An agent whose operator has departed, is silent or suspended is refused with
      `operator_unavailable`. `must_be_removed_by_amendment` is removed.
   2. **Silence.** A person with no sign-in or authenticated request for 90 days is silent, and
-     stops counting toward decisions and funding tiers until they return. Suspended users don't
-     count either (SPEC-02 §3.4).
+     stops counting toward decisions until they return; since the revision, they also aren't paid
+     by pay rules and can't serve as the payments connector. Suspended users don't count either
+     (SPEC-02 §3.4).
   3. **Amend shrinks.** An amend decision shrinks to the people who remain: all remaining
      holders, or `vote(members, 2/3)` if the circle has none. Spend and close decisions never
      shrink (SPEC-02 §4.1). The org is never frozen for good. A 2-person org waits 90 days for a
@@ -456,44 +457,99 @@ ARCHITECTURE > PRD.
      members of at least 30 days are eligible. The vote ends early only when the outcome can no
      longer change (SPEC-01 §4.7, SPEC-02 §4.2–§4.3; the L04 charter sentence is updated). Circle
      votes still count every holder.
-  5. **Own funds and outside money.** Own funds are recorded by an administrator as `attested`
-     (SPEC-03 §5.6). Outside money is protected by SPEC-05 §8:
-     - funding tiers: 0 own funds only; 1 pledges, after 30 days and a track record of accepted
-       spend; 2 upfront donations, after 90 days at tier 1, with 2 qualifying stewards;
-     - pledges that pay back up to 80% of accepted spend, after the fact;
-     - goal-only donations, capped at 3 × the average monthly accepted spend, tracked as
-       first-in-first-out lots;
-     - money-safety checks E505–E507;
+  5. **Own funds and outside money** (revised 2026-10-03, below). Own funds are recorded by an
+     administrator as `attested` (SPEC-03 §5.6). Outside money pays for accepted work at cost plus
+     the org's margin, under seven platform guarantees (SPEC-05 §8.2–§8.9):
+     - an honest meter: only spend openmaru can vouch for is `verified`; usage reported by a custom
+       `openai_base_url` is `attested`, and such calls are refused while a goal holds donations;
+     - earmarked donations, tracked as first-in-first-out lots that spend uses first and that earn
+       margin only on accepted work;
+     - pledges that pay after the fact, at cost plus margin, for accepted work that donations
+       didn't pay for;
+     - a cap on unspent outside money of 10 × a goal's monthly accepted spend, or a $1,000
+       starting allowance per org;
      - a 14-day waiting period with donor exit for every amendment that doesn't only tighten;
-     - liveness steps at 30/45/60/90 days of steward silence, ending in refunds;
-     - payments continuity when whoever connected Stripe is gone;
-     - refunds of unspent outside money when a goal closes;
-     - pledges that may follow a member's fork;
-     - a permanent public record of dormancy.
+     - no new money after 30 days without accepted work and refunds at 90 days, and no new money
+       while whoever connected Stripe is gone;
+     - the recipient's Stripe name shown before anyone pays.
+
+     Everything else about an org is shown, not enforced (SPEC-05 §8.11).
   6. **Forks** copy only a spec into a new org (SPEC-02 §3.7).
-  7. **Settings.** None of these rules is a spec setting in the MVP. Later, orgs may only make
-     the outside-money values stricter; rules that only affect their own people may become
-     bounded settings (SPEC-05 §8.10). This was the recommendation, which the user did not
-     contest.
+  7. **Settings.** The margin and pay rules are the org's to set in its spec. No other rule is a
+     spec setting in the MVP. Later, orgs may only make the outside-money values stricter; rules
+     that only affect their own people may become bounded settings (SPEC-05 §8.12). This was the
+     recommendation, which the user did not contest.
   8. **What this can't do.** Payments are non-custodial, so refunds are best effort. The rules
-     bound outsiders' losses: nothing ahead of accepted work for pledges, and at most a goal's cap
-     for donations. Every loss is public (SPEC-05 §8.11).
+     bound outsiders' losses: nothing beyond accepted work for pledges, and at most a goal's cap
+     (about 10 months of accepted spend) plus the $1,000 allowance for donations. Every loss is
+     public (SPEC-05 §8.13).
+  9. **Earnings and pay** (2026-10-03). `margin: P%` sets the org's markup; `pay @h S% <= usd X /
+     month` gives a member a share of each month's earnings, up to a cap (SPEC-01 §4.9). Earnings
+     belong to the org, not a goal. openmaru computes what is owed each month; the org pays
+     off-platform and records each payment with proof (SPEC-05 §8.10).
 
   Specs updated: PRD, SPEC-01 §4.1, §4.7, §8; SPEC-02; SPEC-03; SPEC-04 §5.1; SPEC-05 §1, §3,
   §4, §5, §7, §8; SPEC-07; SPEC-08 §3; SPEC-09 §4, §6. Tasks: C07 (leaving, silence, forks), P04
   (tiers, pledges, caps) and P05 (waiting period, exit, dormancy, continuity) are new; C03, C04,
   C06, G02, G03, P01, P02, F06, F07, H01, H02 and TASKS.md are updated. The audit brief for
   outside reviewers summarizes all of it.
+- **Revision (user, 2026-10-03):** The user asked for a minimal rule set under which an org can
+  sustain itself on the platform alone, with the threat models of Patreon, GitHub Sponsors,
+  Kickstarter, GoFundMe and Open Collective in mind: people should see an org's qualities,
+  verify its work, and track how their money was used and what came of it. Reviewing the first
+  resolution against that found three problems:
+  - **The 80% pledge share** made every org pay a fifth of its costs itself, so no org could
+    sustain itself on outside money. It only discouraged waste, which caps, receipts and
+    cancellation already bound.
+  - **A hole in the meter.** A custom `openai_base_url` let an org run a server that reports its
+    own usage, recorded as `verified` spend that pledges and donations would pay for.
+  - **Double payment.** Pledges paid for accepted spend that donations had already paid for.
+
+  Decisions: the platform guarantees a few things and shows the rest (item 5); pledges cover up
+  to 100% of accepted spend plus margin; the margin applies to donations and pledges; pay rules
+  divide org-wide earnings, a percentage up to a monthly cap (item 9); the cap is 10× monthly
+  accepted spend with a $1,000 starting allowance; a review window in which pledgers drop tasks
+  from their next charge comes after the MVP.
+
+  Replaced: funding tiers; the 80% share and the locked `reimbursed` account; E505–E507 as gates
+  (now shown as rule flags, and E505 is the payee check); liveness measured by steward activity
+  at 30/45/60/90 days (now by accepted work, at 30 and 90); the 45-day connector rule (now the
+  90-day silence); pledges following forks.
+
+  Updated: PRD; ARCHITECTURE; SPEC-01 §2, §3, §4.9, §5–§9; SPEC-02 §2, §3.1, §3.4, §3.6, §3.7,
+  §4.4, §5.2, §5.3, §7; SPEC-03 §1, §3, §5.4, §5.5, §5.7, §5.8, §6, §9; SPEC-05 §1, §3–§6, §8;
+  SPEC-06 §3; SPEC-07; SPEC-08 §3; SPEC-09 §4, §6. Tasks: L09 (margin and pay in maru) and P06
+  (earnings, pay rules, payouts) are new; P04 is renamed and rewritten (lots, margin, cap,
+  pledges) and P05 rewritten; C03, C04, C06, C07, G03, P01, P02, P03, W03, F06, F07, H01, H02
+  and TASKS.md are updated. Error codes: `funding_tier_required` is replaced by `not_accepting_money`, and
+  `custom_upstream_not_allowed` is new. OQ-18 is open.
 
 ### OQ-17: Do upfront donations stay in the MVP?
 - **Task:** OQ-16 (affects P02, P04, P05, F07, H01)
 - **Status:** open
 - **Conflict:** The PRD's core loop and success criteria were written around donations made
-  before the work. Under OQ-16 those are the hardest tier to reach (90 days at tier 1) and need
-  the most protection (cap, lots, waiting period and exit, dormancy refunds, continuity), while
-  pledges are safe by construction.
-- **Options:** (a) keep both tiers in the MVP; (b) ship pledges only, and move upfront donations
-  (P02's checkout, the cap and lots in P04, and most of P05) after the MVP.
+  before the work. Under OQ-16 they need most of the protection: lots and unearned margin, the
+  cap and starting allowance, the waiting period and exit, dormancy refunds and continuity.
+  Pledges pay only for accepted work and need almost none of it.
+- **Options:** (a) keep both in the MVP; (b) ship pledges only, and move upfront donations
+  (P02's checkout, the lots and cap in P04, and most of P05) after the MVP.
 - **Chosen (interim):** (a), so the plan and specs cover the complete rule set; cutting (b) later
   removes work rather than adding it.
+- **Resolution:**
+
+### OQ-18: Can a one-person org earn from outside money?
+- **Task:** OQ-16 revision (affects SPEC-02 §6.1, SPEC-05 §8.1, P04)
+- **Status:** open
+- **Conflict:** Accepted spend needs a task accepted by a steward holder other than the claimant
+  and the claimant agent's operator (SPEC-02 §6.1). A founder working alone with an agent can
+  never accept the agent's work, so the org never has accepted spend: pledges charge nothing,
+  no margin is earned, and its cap stays at the $1,000 starting allowance. That blocks the
+  Patreon-like case of one person with agents sustaining themselves, while a second account of
+  the same person gets around the rule.
+- **Options:** (a) keep the rule: a founder working alone invites a second person to review;
+  (b) let an operator accept their own agent's work, labelled self-reviewed on receipts and in
+  the review disclosure, and let each pledger choose whether to pay for self-reviewed work;
+  (c) as (b), without the choice.
+- **Chosen (interim):** (a), the existing rule. Nothing built so far depends on the choice; P04
+  is the first task that does.
 - **Resolution:**

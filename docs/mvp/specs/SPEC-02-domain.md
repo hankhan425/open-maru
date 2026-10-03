@@ -20,7 +20,7 @@ A principal is `{kind: person|agent|system, id}`. Stored as `(principal_kind, pr
 | `orgs` | `slug citext unique` (`[a-z0-9-]{3,40}`), `name`, `active_version_id`, `status` (`active/suspended`), `created_by`, `forked_from_org_id null`, `forked_from_version_id null` (§3.7) |
 | `memberships` | `org_id`, `user_id`, `source` (`creator/open/invite/holder/operator`), `joined_at`, `left_at null`; unique active (`org_id`,`user_id`) |
 | `sponsorships` | `org_id`, `candidate_user_id`, `sponsor_user_id`; unique triple |
-| `spec_versions` | `org_id`, `number` (1..), `source_text`, `source_hash`, `ir jsonb`, `charter jsonb`, `parent_version_id null`, `decision_id null`, `created_by`, `activates_at null` (a passed amendment waiting, SPEC-05 §8.5), `activated_at null`; unique(`org_id`,`number`) |
+| `spec_versions` | `org_id`, `number` (1..), `source_text`, `source_hash`, `ir jsonb`, `charter jsonb`, `parent_version_id null`, `decision_id null`, `created_by`, `activates_at null` (a passed amendment waiting, SPEC-05 §8.6), `activated_at null`; unique(`org_id`,`number`) |
 | `circles` | `org_id`, `ident`, `seats`, `term_secs bigint null`, `active bool`; unique(`org_id`,`ident`) |
 | `circle_holders` | `circle_id`, `user_id`, `accepted_at null`, `appointed_at`, `removed_at null` |
 | `agents` | `org_id`, `ident`, `operator_user_id`, `runtime` (`byo/hosted`), `active bool`; unique(`org_id`,`ident`) |
@@ -35,7 +35,7 @@ A principal is `{kind: person|agent|system, id}`. Stored as `(principal_kind, pr
 | `leases` | `task_id`, `principal_*`, `ttl_secs`, `expires_at`, `released_at null`, `end_reason null` (`released/expired/submitted/cancelled/goal_paused`) |
 | `evidence` | `goal_id`, `task_id null`, `kind` (`commit/pull_request/deploy/url/file/note`), `url null`, `upload_id null`, `summary` (≤2k), `posted_by_*` |
 | `reviews` | `task_id`, `reviewer_user_id`, `verdict` (`accept/reject`), `comment` |
-| `uploads` | `org_id`, `purpose` (`receipt/evidence/proof`), `object_key`, `content_type`, `byte_size`, `sha256`, `status` (`pending/stored`), `uploaded_by_*` |
+| `uploads` | `org_id`, `purpose` (`receipt/evidence/proof`; `proof` covers reimbursements and payouts), `object_key`, `content_type`, `byte_size`, `sha256`, `status` (`pending/stored`), `uploaded_by_*` |
 | `activity_events` | `org_id`, `goal_id null`, `kind`, `actor_*`, `subject_type`, `subject_id`, `payload jsonb`, `visibility` (`public/members`), `occurred_at`; append-only |
 
 Ledger, spend, payments, gateway, runtime tables are in SPEC-03/05/06.
@@ -49,7 +49,7 @@ Ledger, spend, payments, gateway, runtime tables are in SPEC-03/05/06.
    - **E501** every `@handle` resolves to an existing user who is neither suspended nor deleted.
    - **E502** creator is a declared holder of at least one circle.
    - **E504** the `amend` procedure is satisfiable by *accepted* holders (at genesis: only the creator is accepted). E.g. `approve(core, 2)` at genesis is rejected; start with `approve(core, 1)` and tighten after others accept.
-   - **E505–E507** only for an org with a goal at funding tier 2: money-safety checks (SPEC-05 §8.6).
+   - **E505** every `pay` handle (SPEC-01 §4.9) is a member of the org: at genesis the creator, a listed holder or an operator; later, a member with an active membership.
 3. In one transaction: insert org, version 1 (activated now), project IR (§3.3), create memberships (creator; holders and operators as `holder`/`operator`), create ledger accounts (SPEC-03), emit `org.created` and `spec.version_activated`.
 4. The creator's holder rows are `accepted_at = now`. Other listed holders are pending until they accept.
 
@@ -68,7 +68,7 @@ Runs in the activation transaction of each version:
 ### 3.4 Effective holders
 `effective_holders(circle, at)` = holders with `accepted_at` set, `removed_at` null, (`term_secs` null or `appointed_at + term_secs > at`), whose user is neither suspended nor **silent**.
 
-A person is **silent** when their `last_active_at` is more than **90 days** before `at`. One sign-in makes them count again. A silent person keeps every right to act, and any action makes them active again; while silent they only stop counting toward decisions and funding-tier conditions (SPEC-05 §8.1). A suspended person counts again once unsuspended (OQ-16).
+A person is **silent** when their `last_active_at` is more than **90 days** before `at`. One sign-in makes them count again. A silent person keeps every right to act, and any action makes them active again; while silent they only stop counting toward decisions, are not paid by pay rules, and stop being an available payments connector (SPEC-05 §8.8, §8.10). A suspended person counts again once unsuspended (OQ-16).
 
 **Holdover rule** (prevents term-lapse deadlock): when opening an **amend** decision, if the effective holders of the procedure's circle cannot satisfy it, holders whose terms lapsed (but are still listed and accepted, and are neither silent nor suspended) are also eligible, for amend decisions only.
 
@@ -82,7 +82,8 @@ A person **departs** an org when they leave it or their account is deleted (dele
 - the membership gets `left_at`; holder rows get `removed_at`, so they no longer count anywhere (`member.left`, `holder.departed`);
 - their person mandates in the org are revoked with every token;
 - each agent they operate is stopped (SPEC-06 `stop_agent`: tokens revoked, in-flight requests aborted, sessions stopped);
-- they can no longer vote in decisions they were eligible for (`not_eligible`).
+- they can no longer vote in decisions they were eligible for (`not_eligible`);
+- pay rules naming them owe them nothing more (SPEC-05 §8.10); what they were already owed stays owed.
 
 The spec keeps naming them until an amendment changes it, and the org page marks them as departed. A later version that still names them gives roles back only the usual way: a seat must be accepted again, and a mandate is granted as to anyone.
 
@@ -91,7 +92,7 @@ An agent whose operator has departed, is suspended or deleted, or is silent may 
 There is no owner role: the creator has no powers beyond the spec. When people leave or go silent, the org keeps working through §4.1's rules, or its members fork it (§3.7).
 
 ### 3.7 Forks
-Any signed-in user may fork an org: `POST /orgs/:slug/forks {slug, source}` creates a new org through §3.1 (E501/E502/E504 apply, so the forker usually edits the source first) and records `forked_from_org_id` and `forked_from_version_id`. Only the spec is copied: no funds, members, holders' consent, Stripe account or history. Both org pages show the link; the original lists the forks made by people who were its members when they forked it, and its pledges may follow those (SPEC-05 §8.9).
+Any signed-in user may fork an org: `POST /orgs/:slug/forks {slug, source}` creates a new org through §3.1 (E501/E502/E504 apply, so the forker usually edits the source first) and records `forked_from_org_id` and `forked_from_version_id`. Only the spec is copied: no funds, members, holders' consent, Stripe account or history. Both org pages show the link; the original lists the forks made by people who were its members when they forked it. Supporters who want to follow a fork pledge or donate to it anew.
 
 ## 4. Decisions engine
 
@@ -127,12 +128,12 @@ One engine for amendments, gated spend, and goal closure.
 ### 4.4 Effects (run in the same transaction as the status change)
 | Kind | On pass | On fail/cancel |
 |---|---|---|
-| `amend` | If org's active version ≠ proposal's base → status `stale`, no effect. Else, if the org holds outside money and the diff has a change that is not `tightens`, create the version **scheduled** (`activates_at` = now + 14 days, `spec.version_scheduled`; SPEC-05 §8.5). An Oban job activates it then, unless the active version changed in the meantime (the version is `stale`). Otherwise activate now. Activating projects, emits events, and makes every other open amend decision of the org `stale`. | nothing |
+| `amend` | If org's active version ≠ proposal's base → status `stale`, no effect. Else, if the org holds unspent outside money (U > 0 in any goal) and the diff has a change that is not `tightens`, create the version **scheduled** (`activates_at` = now + 14 days, `spec.version_scheduled`; SPEC-05 §8.6). An Oban job activates it then, unless the active version changed in the meantime (the version is `stale`). Otherwise activate now. Activating projects, emits events, and makes every other open amend decision of the org `stale`. | nothing |
 | `spend` | Execute the held spend (SPEC-04 §5) | Void the hold; spend record `denied` |
 | `close_goal` | Close the goal (§5.3) | nothing |
 
 - Cancel: the author may cancel an open decision → `cancelled`.
-- Amendment proposal creation re-runs server validation (E501–E507) against the proposal IR and computes `diff` vs the base version.
+- Amendment proposal creation re-runs server validation (E501–E505) against the proposal IR and computes `diff` vs the base version.
 
 ## 5. Goals
 
@@ -148,12 +149,12 @@ One engine for amendments, gated spend, and goal closure.
 | underfunded / paused(underfunded) | shortfall fully topped up | active |
 | active / underfunded | steward holder pauses (kill switch) | paused(manual) |
 | paused(manual) | steward holder resumes | active, or underfunded/paused(underfunded) if a shortfall remains |
-| active / underfunded | 60 days without steward activity while holding outside money or pledges (SPEC-05 §8.7) | paused(dormant); `dormant_at` set at day 90 |
+| any non-closed state except paused(dormant) | a watched goal holding unspent outside money reaches 90 days without progress (SPEC-05 §8.7) | paused(dormant), `dormant_at` set; unspent outside money refunded (a goal without any is only marked dormant) |
 | paused(dormant) | steward holder resumes | as for paused(manual); `dormant_at` cleared |
 | any non-closed | close decision passes | closed |
 
 ### 5.3 Closing
-`request_close(goal, principal)` opens a `close_goal` decision using the goal's `rule close` or, if none, `approve(<steward>, 1) within 7d else deny`. On pass, in order: void all holds; stop sessions; revoke mandate tokens; cancel open/claimed/in-review tasks (`task.cancelled`); refund unspent outside money (SPEC-05 §8.9), then dispose the rest per `on_close` (SPEC-03 §5.4); `status=closed`, `closed_at`; emit `goal.closed`.
+`request_close(goal, principal)` opens a `close_goal` decision using the goal's `rule close` or, if none, `approve(<steward>, 1) within 7d else deny`. On pass, in order: void all holds; stop sessions; revoke mandate tokens; cancel open/claimed/in-review tasks (`task.cancelled`); refund unspent outside money (SPEC-05 §8.3), then dispose the rest per `on_close` (SPEC-03 §5.4); `status=closed`, `closed_at`; emit `goal.closed`.
 
 ### 5.4 Metrics
 `report_metric(goal, principal, name, value, observed_at)`: allowed for steward holders or principals with `report_metric:<name>`. `value` is a decimal string. Success status computed on read: `met` if the latest value satisfies the comparator (and was observed before the deadline if any), `missed` if the deadline passed unmet, else `in_progress`.
@@ -188,6 +189,6 @@ URLs must be `https://` (≤ 2,048 chars). `file` evidence references a `stored`
 
 ## 7. Activity events
 
-Kinds: `org.created`, `org.forked`, `spec.version_scheduled`, `spec.version_activated`, `member.joined`, `member.left`, `holder.departed`, `member.sponsored`, `holder.accepted`, `holder.declined`, `holder.lapsed`, `decision.opened`, `decision.ballot_cast`, `decision.resolved`, `goal.adopted`, `goal.funded`, `goal.underfunded`, `goal.paused`, `goal.resumed`, `goal.dormancy_warning`, `goal.dormant`, `goal.closed`, `funds.contributed`, `pledge.created`, `pledge.charged`, `pledge.cancelled`, `donation.exited`, `goal.metric_reported`, `mandate.token_issued`, `mandate.token_revoked`, `spend.held`, `spend.posted`, `spend.voided`, `spend.denied`, `donation.received`, `donation.refunded`, `task.created`, `task.claimed`, `task.released`, `task.lease_expired`, `task.submitted`, `task.accepted`, `task.rejected`, `task.cancelled`, `evidence.posted`, `session.started`, `session.stopped`, `ledger.checkpoint`.
+Kinds: `org.created`, `org.forked`, `spec.version_scheduled`, `spec.version_activated`, `member.joined`, `member.left`, `holder.departed`, `member.sponsored`, `holder.accepted`, `holder.declined`, `holder.lapsed`, `decision.opened`, `decision.ballot_cast`, `decision.resolved`, `goal.adopted`, `goal.funded`, `goal.underfunded`, `goal.paused`, `goal.resumed`, `goal.dormancy_warning`, `goal.dormant`, `goal.closed`, `funds.contributed`, `pledge.created`, `pledge.charged`, `pledge.cancelled`, `donation.exited`, `pay.owed`, `pay.paid`, `earnings.retained`, `goal.metric_reported`, `mandate.token_issued`, `mandate.token_revoked`, `spend.held`, `spend.posted`, `spend.voided`, `spend.denied`, `donation.received`, `donation.refunded`, `task.created`, `task.claimed`, `task.released`, `task.lease_expired`, `task.submitted`, `task.accepted`, `task.rejected`, `task.cancelled`, `evidence.posted`, `session.started`, `session.stopped`, `ledger.checkpoint`.
 
 All are `public` except `mandate.token_issued`/`mandate.token_revoked` (`members`). Donor identity is never in a public payload unless the donor opted in. Events are emitted inside the same transaction as the change they describe and broadcast after commit.

@@ -14,7 +14,7 @@ Org administrators connect their own Stripe account; webhooks are received secur
 - `Openmaru.Payments.StripeClient` behaviour (full callback list from SPEC-05 §7) + `stripity_stripe` implementation + Mox mock.
 - Migrations `stripe_accounts`, `stripe_events`.
 - Administrators per SPEC-05 §2 through C03's `Orgs.administrators/1`.
-- `stripe_accounts.connected_by_user_id`: the administrator who started onboarding (P05 uses it for payments continuity, SPEC-05 §8.8).
+- `stripe_accounts.connected_by_user_id`: the administrator who started onboarding (P05 uses it for payments continuity, SPEC-05 §8.8). `display_name` and `country` from `account.updated`, shown to supporters as the recipient (SPEC-05 §8.9). `replaced_at` (null for the current account; P05 sets it).
 - Onboarding + status endpoints.
 - Two webhook endpoints with separate secrets, raw-body signature verification, store-then-process via Oban worker, dispatch by event type (only `account.updated` handled here; P02 adds more handlers through a dispatch map).
 
@@ -22,7 +22,7 @@ Org administrators connect their own Stripe account; webhooks are received secur
 - [ ] **P01-T01** Administrator requests onboarding → account created once (mock), account link URL returned; second call reuses the account.
 - [ ] **P01-T02** Non-administrator member → 403.
 - [ ] **P01-T03** `amend: vote(members, …)` → every effective holder of any circle is an administrator.
-- [ ] **P01-T04** Signed `account.updated` → status fields updated; bad signature → 400; timestamp outside 5-minute tolerance → 400.
+- [ ] **P01-T04** Signed `account.updated` → status fields, `display_name` (`business_profile.name`, else the dashboard display name) and `country` updated; bad signature → 400; timestamp outside 5-minute tolerance → 400.
 - [ ] **P01-T05** Duplicate event id → 200, processed once.
 - [ ] **P01-T06** Handler error → Oban retries; `stripe_events.error` recorded; success clears it and sets `processed_at`.
 - [ ] **P01-T07** `GET /payments/status` returns flags and a human summary of `requirements.currently_due`.

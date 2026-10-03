@@ -25,7 +25,7 @@ Agents configure e.g. Claude Code with `ANTHROPIC_BASE_URL=<host>/gw/anthropic` 
 ### 3.1 Request pipeline
 1. Extract token (`x-api-key` or `Authorization: Bearer`); verify as mandate token with `operation("gateway")`; optional `x-openmaru-task` must be a task of the token's goal (`task_not_in_goal`).
 2. Rate limit per mandate (default 600 req/min) → `rate_limited`.
-3. Load provider secret for the goal → else `provider_credentials_missing`.
+3. Load provider secret for the goal → else `provider_credentials_missing`. A goal with a custom `openai_base_url` that holds unspent outside money (SPEC-05 §8.2) → `custom_upstream_not_allowed`.
 4. Parse body; model must be priced (`model_not_priced`). Validate features (§3.2, §3.3).
 5. Compute **hold** (upper bound, §3.2/§3.3).
 6. `Spend.request(category=llm, amount=hold, source=gateway, wait_for_approval?=false, hold_timeout=900)`. Denials map to errors (§3.5).
@@ -47,6 +47,7 @@ Agents configure e.g. Claude Code with `ANTHROPIC_BASE_URL=<host>/gw/anthropic` 
 - Streaming: the gateway sets `stream_options.include_usage = true`. If the client did not request it, the final usage-only chunk is consumed and **not** forwarded.
 - Cost = (prompt − cached)×input + cached×cache_read + completion×output (`completion_tokens` includes reasoning tokens).
 - Upstream base URL: goal secret `openai_base_url` or `https://api.openai.com`. Auth `Authorization: Bearer <goal secret>`.
+- A custom base URL reports its own usage, which openmaru cannot vouch for: its spend posts as tier `attested` with `meta.custom_upstream = true`, never `verified` (SPEC-03 §6, SPEC-05 §8.2).
 
 ### 3.4 Failure handling
 | Situation | Behavior |
@@ -65,7 +66,7 @@ Anthropic routes: `{"type":"error","error":{"type":"<anthropic type>","message":
 |---|---|---|
 | `invalid_token` | 401 | `authentication_error` |
 | `budget_exceeded`, `goal_funds_insufficient` | 402 | `permission_error` |
-| `approval_required`, `no_mandate`, `category_not_permitted`, `per_request_exceeded`, `mandate_expired`, `mandate_revoked`, `task_not_in_goal` | 403 | `permission_error` |
+| `approval_required`, `no_mandate`, `category_not_permitted`, `per_request_exceeded`, `mandate_expired`, `mandate_revoked`, `task_not_in_goal`, `operator_unavailable`, `custom_upstream_not_allowed` | 403 | `permission_error` |
 | `goal_paused` | 423 | `permission_error` |
 | `model_not_priced`, `unsupported_feature`, `invalid_request` | 400 | `invalid_request_error` |
 | `provider_credentials_missing` | 424 | `api_error` |

@@ -25,9 +25,10 @@ Canonical example: `examples/lumen.maru`. Its golden charter: `examples/lumen.ch
 | `DURATION` | `INT` + unit `m` (minutes), `h`, `d`, `w` (7d), `y` (365d). Must be > 0 (E319) and at most 100 years (E104). (E104) |
 | `DATE` | `YYYY-MM-DD`, valid Gregorian date, years 2000–2999 (E105) |
 | `THRESHOLD` | `INT "/" INT` (fraction, 0 < a/b ≤ 1) or `INT "%"` (1–100) (E308) |
+| `PERCENT` | `INT "%"`: a margin of 1–1000, a pay share of 1–100 (E326) |
 | Punctuation | `{ } ( ) : , / <= >= < > == ->` |
 
-**Keywords (reserved):** `org purpose members open invite sponsors amend circle seats term holders agent operator runtime byo hosted goal steward fund from treasury once success metric by on_underfunded pause continue on_close return transfer mandate spend per_request can expires claim_tasks create_tasks post_evidence report_metric rule requires approve vote within else deny allow close usd llm compute expense day week month`
+**Keywords (reserved):** `org purpose members open invite sponsors amend margin pay circle seats term holders agent operator runtime byo hosted goal steward fund from treasury once success metric by on_underfunded pause continue on_close return transfer mandate spend per_request can expires claim_tasks create_tasks post_evidence report_metric rule requires approve vote within else deny allow close usd llm compute expense day week month`
 
 ## 3. Grammar (EBNF)
 
@@ -37,9 +38,13 @@ org_decl      = "org" STRING "{" { org_item } "}" ;
 org_item      = "purpose" STRING
               | "members" ":" membership
               | "amend" ":" procedure [ timeout ]
+              | "margin" ":" percent
+              | pay
               | circle | agent | goal ;
 membership    = "open" "(" ")"
               | "invite" "(" "sponsors" ":" INT ")" ;
+pay           = "pay" HANDLE percent "<=" money "/" "month" ;
+percent       = INT "%" ;
 
 circle        = "circle" IDENT "{" { circle_item } "}" ;
 circle_item   = "seats" ":" INT
@@ -140,6 +145,12 @@ Parsing is error-tolerant: on a syntax error inside a block, the parser skips to
 - Durations: `m`=60s, `h`=3600s, `d`=86400s, `w`=604800s, `y`=31536000s. At most 100 years = 3_153_600_000 s in any unit (`36500d` and `5214w` pass, `5215w` fails; E104), so every deadline and term end computed from a spec stays within the date range of Elixir, Postgres and JS.
 - Counts (`seats`, `sponsors`, approval counts, threshold numbers) are at most 2_147_483_647 (E103), so they fit a Postgres `integer` and a JS number. Metric values have no limit (the IR keeps them as strings, without leading zeros in the integer part).
 
+### 4.9 Margin and pay
+- `margin: P%` optional, at most one (E305), 1 ≤ P ≤ 1000 (E326). Outside money (pledges and donations) pays for accepted work at cost plus P%, and the margin goes to the org's **earnings** (SPEC-05 §8.10). Without `margin`, outside money pays cost only and the org has no earnings.
+- `pay @h S% <= usd X / month`: each month, @h is owed S% of the earnings the org received the month before, up to X. 1 ≤ S ≤ 100 (E326). One pay rule per person (E328). The shares of all pay rules total at most 100% (E327); what they leave stays with the org.
+- The person must be a member of the org when a version is checked on the server (E505, SPEC-02 §3.1), and is paid only while an active member who is neither silent nor suspended (SPEC-05 §8.10). Naming someone in a pay rule doesn't make them a member.
+- Pay rules without a margin owe nothing (W409). Pay is drawn only from earnings, never from goal funds, the treasury or own funds.
+
 ## 5. Static checks
 
 The checker is pure: `check(source, opts) → {diagnostics, ir?}`. IR is returned only when there are no errors. `opts.now` (optional ISO timestamp) enables time-relative warnings; without it they are skipped so checking stays deterministic.
@@ -147,12 +158,12 @@ The checker is pure: `check(source, opts) → {diagnostics, ir?}`. IR is returne
 Checking has two stages. The parser reports E1xx, E2xx, E310 and E311. If it reports any error, `check` returns those diagnostics alone: no semantic checks run and there is no IR. The parser leaves an item with an error out of the tree, so checking that tree would report the same mistake again (a malformed `seats` would also be a missing one, E304). The first stage also formats the tree for the spec hash; when the formatted source would exceed 256 KiB, `check` returns that E109 alone. Semantic checks (the other E3xx codes and all W4xx) run only on a source that parses without errors.
 
 Within the semantic stage, one mistake gives one diagnostic:
-- A repeat is reported at its second occurrence, with a note giving the first one's position (e.g. `first declared at line 7, column 10`): E301, E305, E312, E313, E314, E323, E325, W408. The repeat is then ignored (a second `fund` is not compared with spend limits; a repeated `can` adds nothing).
-- E305 covers every field that may appear once: `purpose`, `members` and `amend` in the org; `seats`, `term` and `holders`; `operator` and `runtime`; `steward`, `purpose`, `fund`, `on_underfunded`, `on_close` and `success` in a goal; `per_request`, `can` and `expires` in a mandate. Repeated `spend` lines are E313 (per category).
-- A value that is already an error is not checked again for its consequences: no E306 for a circle whose `seats` is missing or 0; no E307 above the seats of such a circle; no E316 where E307 or E302 applies; no W403 for a zero `fund` or spend limit; an unknown steward is E302, not also E317; a rule that repeats a subject is E314, not also E325.
+- A repeat is reported at its second occurrence, with a note giving the first one's position (e.g. `first declared at line 7, column 10`): E301, E305, E312, E313, E314, E323, E325, E328, W408. The repeat is then ignored (a second `fund` is not compared with spend limits; a repeated `can` adds nothing).
+- E305 covers every field that may appear once: `purpose`, `members`, `amend` and `margin` in the org; `seats`, `term` and `holders`; `operator` and `runtime`; `steward`, `purpose`, `fund`, `on_underfunded`, `on_close` and `success` in a goal; `per_request`, `can` and `expires` in a mandate. Repeated `spend` lines are E313 (per category).
+- A value that is already an error is not checked again for its consequences: no E306 for a circle whose `seats` is missing or 0; no E307 above the seats of such a circle; no E316 where E307 or E302 applies; no W403 for a zero `fund` or spend limit; an unknown steward is E302, not also E317; a rule that repeats a subject is E314, not also E325; a pay share that is E326, or a pay rule that is E328, is left out of E327's total.
 - Circles, agents and goals have separate id spaces (a circle and a goal may both be `core`). A reference to a repeated id resolves to its first declaration.
 
-Spans: E301, E302, E303, E312, E315 and E317 point at the identifier or handle; E304 at the block's identifier (the org's name for `amend`); E305, E306, E313, E325, W403, W404 and W405 at the whole item; E307 at the count; E308 at the threshold; E309 at the amount (`usd …`); E314 at the second rule's subject; E316 at the procedure; E318 at the goal's id; E319 at the duration; E322 at `members`; E324 at the number; W401 at the date; W402 at `within … else allow`; W406 at the agent's id; W408 at the repeated capability. Diagnostics are sorted by span start; ties keep the order in which they were found.
+Spans: E301, E302, E303, E312, E315 and E317 point at the identifier or handle; E304 at the block's identifier (the org's name for `amend`); E305, E306, E313, E325, W403, W404 and W405 at the whole item; E307 at the count; E308 at the threshold; E309 at the amount (`usd …`); E314 at the second rule's subject; E316 at the procedure; E318 at the goal's id; E319 at the duration; E322 at `members`; E324 at the number; E326 at the percentage; E327 at the pay rule whose share takes the running total (in source order) over 100%; E328 at the second pay rule's handle; W409 at the first pay rule; W401 at the date; W402 at `within … else allow`; W406 at the agent's id; W408 at the repeated capability. Diagnostics are sorted by span start; ties keep the order in which they were found.
 
 | Code | Severity | Condition |
 |---|---|---|
@@ -191,6 +202,9 @@ Spans: E301, E302, E303, E312, E315 and E317 point at the identifier or handle; 
 | E323 | error | Duplicate holder in a circle |
 | E324 | error | `seats` or `invite(sponsors: …)` is 0 |
 | E325 | error | Two rules in a goal have the same rule id (§4.6) |
+| E326 | error | Percentage out of range (`margin` 1–1000%, a pay share 1–100%) |
+| E327 | error | Pay shares total more than 100% |
+| E328 | error | Two pay rules for the same person |
 | W401 | warning | Mandate `expires` is in the past: `opts.now` is at or after `DATE`T00:00:00Z (only with `opts.now`) |
 | W402 | warning | `else allow` on a rule or `amend` |
 | W403 | warning | A mandate's spend limit for a category exceeds the goal's `fund` normalized to the same period (both converted to a month with the §6.1 factors: `usd 50 / day` is 1,550 a month; a `once` fund never warns) |
@@ -198,6 +212,7 @@ Spans: E301, E302, E303, E312, E315 and E317 point at the identifier or handle; 
 | W405 | warning | `per_request` exceeds every spend limit of the mandate, which has at least one (no effect) |
 | W406 | warning | Agent declared but holds no mandate in any goal (once, at its first declaration) |
 | W408 | warning | Duplicate capability |
+| W409 | warning | Pay rules but no `margin` (nothing to pay from) |
 
 Diagnostic shape (all targets):
 ```json
@@ -219,6 +234,8 @@ Stable JSON consumed by server, web, CLI. `ir_version: 1`. Arrays preserve sourc
     "membership": {"kind": "invite", "sponsors": 1},
     "amend": {"procedure": {"kind": "vote", "circle": "core", "threshold": {"num": 2, "den": 3, "percent": false}},
               "within": {"value": 7, "unit": "d", "secs": 604800}, "else": "deny"},
+    "margin_percent": null,
+    "pay": [],
     "circles": [{"id": "core", "seats": 3, "term": {"value": 1, "unit": "y", "secs": 31536000}, "holders": ["mina", "jo"]}],
     "agents": [{"id": "builder", "operator": "mina", "runtime": "hosted"}],
     "goals": [{
@@ -254,8 +271,9 @@ Stable JSON consumed by server, web, CLI. `ir_version: 1`. Arrays preserve sourc
 Thresholds are stored as fractions with the form they were written in: `60%` → `{"num":60,"den":100,"percent":true}` (not reduced); `2/4` stays `{"num":2,"den":4,"percent":false}`, so the charter can say "60%" or "2/4" as written. Durations keep their source unit (`{"value":48,"unit":"h","secs":172800}`) so the charter can say "48 hours". `term` is `null` when absent. Defaults are materialized in the IR (never absent); the default timeout is `{"value":7,"unit":"d","secs":604800}`.
 
 The full shape is `crates/maru_core/schema/ir.v1.json` (JSON Schema 2020-12; every field required, no other fields). Beyond the excerpt:
-- Every field is always present. Optional values without a default are `null`: org and goal `purpose`, `term`, `fund`, `success`, `success.by`, `per_request_micros`, `expires`. Lists are `[]` when empty.
+- Every field is always present. Optional values without a default are `null`: org and goal `purpose`, `margin_percent`, `term`, `fund`, `success`, `success.by`, `per_request_micros`, `expires`. Lists are `[]` when empty.
 - `membership`: `{"kind":"open"}` or `{"kind":"invite","sponsors":N}`.
+- `margin_percent`: the margin as an integer (1–1000), or `null`. `pay`: `[{"payee":"<handle>","share_percent":S,"max_micros":X}]` in source order (the period is always a month).
 - `fund.period`: `"day"`, `"week"`, `"month"`, or `"once"` for `usd X once from treasury`.
 - `on_close`: `{"kind":"return_treasury"}` or `{"kind":"transfer","goal":"<goal id>"}`.
 - `success.value`: the metric target as a decimal string (`-` sign, no `_`, no leading zeros in the integer part, fraction digits as written; §4.8).
@@ -278,7 +296,7 @@ For each goal, `unapproved_monthly_max_micros` is an upper bound on spend possib
 - Blank lines: exactly one blank line before and after every block item (`circle`, `agent`, `goal`, `mandate`), and one before the first `rule` that follows a non-rule item. Never a blank line at the start or end of an enclosing block, never two in a row, none elsewhere. The blank line goes above an item's leading comments, and comments before a block's `}` count as content that follows: a block item just before them is set off by a blank line. An empty block without comments is written `{}`.
 - Item order is preserved (the formatter never reorders).
 - Numeric literals (money, counts, metric values): the integer part is grouped with `_` by thousands **iff it has 4 or more digits** (`12000` → `12_000`, `4000` → `4_000`, `500` stays `500`, `1_0` → `10`). Money fractions: trailing zeros trimmed but at least 2 digits if any fraction remains (`12.5` → `12.50`, `3.000100` → `3.0001`, `7.00` → `7`). Threshold numbers are counts (`vote(core, 1_000/3_000)`). Metric values are grouped the same way and lose the leading zeros of their integer part, so `010` and `10` hash the same; their fraction digits stay as written, because the AST and IR keep metric values as text (`-1500.5` → `-1_500.5`, `-007.50` → `-7.50`, `12.50` stays). Durations and dates are not grouped; a duration is its count without leading zeros followed by its unit (`007d` → `7d`, `36_500d` → `36500d`).
-- Spacing: `key: value`; `usd 12_000 / month`; `vote(core, 2/3)`; operators surrounded by single spaces.
+- Spacing: `key: value`; `usd 12_000 / month`; `vote(core, 2/3)`; `margin: 15%`; `pay @mina 40% <= usd 4_000 / month`; operators surrounded by single spaces.
 - Comments: full-line comments stay attached above the following item at that item's indentation; trailing comments stay on their line after one space. A comment after `{` stays on that line; comments before `}` stay inside the block at item indentation; a comment written between the tokens of one item moves above that item. Trailing whitespace in comments is removed.
 - Text: LF line endings (CRLF input is normalized), no trailing whitespace, exactly one final newline. Strings are written with the canonical escapes `\"`, `\\`, `\n`.
 - Properties: idempotent (`fmt(fmt(x)) == fmt(x)`) and AST-preserving (`ast(fmt(x)) == ast(x)` ignoring spans and comments).
@@ -288,7 +306,7 @@ For each goal, `unapproved_monthly_max_micros` is an upper bound on spend possib
 
 Deterministic IR → Markdown. Never uses an LLM. Structure and exact sentences are defined by the golden file `examples/lumen.charter.md` plus these templates. Every default is rendered explicitly.
 
-**Sections in order:** `# <org name>`, purpose paragraph (if any), `## Membership`, `## Changing this charter`, `## Circles` (omitted if none, which needs an org with no goals and `amend: vote(members, …)`), `## Agents` (omitted if none), then per goal `## Goal: <title>` with purpose paragraph, bullet facts, `### Mandates` (omitted if none), `### Rules` (omitted if none), `### Limits`.
+**Sections in order:** `# <org name>`, purpose paragraph (if any), `## Membership`, `## Changing this charter`, `## Circles` (omitted if none, which needs an org with no goals and `amend: vote(members, …)`), `## Agents` (omitted if none), `## Earnings` (omitted with no `margin` and no pay rules), then per goal `## Goal: <title>` with purpose paragraph, bullet facts, `### Mandates` (omitted if none), `### Rules` (omitted if none), `### Limits`.
 
 **Formatting helpers**
 - Money: `$12,000` for whole dollars; otherwise at least 2 and at most 6 decimals, trailing zeros trimmed past 2: `$12.50`, `$0.000125`.
@@ -303,6 +321,7 @@ Deterministic IR → Markdown. Never uses an LLM. Structure and exact sentences 
 - Amend — vote: `Changes need a vote of <C>, passing with at least <T> of its holders in favour within <D>.`; vote members: `Changes need a vote of all members in which at least 20% vote, passing with at least <T> of the votes cast in favour within <D>.`; approve: `Changes need approval from <N> holder(s) of <C> within <D>.` Then `If the vote does not pass in time, the change is rejected.` (vote/deny), `If not approved in time, the change is rejected.` (approve/deny), `If not decided in time, the change is applied.` (allow).
 - Circle: `- **<id>**: <S> seat(s), each held for <term>.` or `- **<id>**: <S> seat(s) with no term limit.` then ` Holders: <handles joined by ", ", or none>.` then vacancy ` 1 seat is vacant.` / ` K seats are vacant.` (omitted when 0).
 - Agent: `- **<id>** is an AI agent operated by @<op>, running on the hosted runtime.` / `…, running on its operator's own infrastructure.`
+- Earnings paragraph: `Supporters pay a margin of <P>% on top of the cost of the accepted work their money pays for. It goes to the org's earnings.` / without a margin: `There is no margin, so the org has no earnings.` Then one bullet per pay rule: `- @<h> is paid <S>% of each month's earnings, up to <$X> per month.`
 - Goal bullets in order: `Stewarded by <C>.`; funding (see below); closure; success (if any).
 - Funding: `Receives <$X> from the treasury at the start of each <day|week (Monday)|month>.` / `Receives <$X> from the treasury once, when this goal is first adopted.` / `Is funded only by donations.` Followed (only if `fund` present) by ` If the treasury cannot cover it, work on this goal pauses until it is funded.` or ` If the treasury cannot cover it, work continues with the funds available.`
 - Closure: `When closed, its remaining funds return to the treasury.` / `When closed, its remaining funds move to the goal <other title>.`
@@ -320,7 +339,7 @@ The renderer also returns a structured form for the web UI: `[{"section": "…",
 
 `diff(ir_before, ir_after) → {changes: [Change], limits: [{goal, before_micros, after_micros}]}`.
 
-Matching keys: circles/agents/goals by `id`; mandates by `(goal, principal)`; rules by `(goal, canonical subject)` (so a changed procedure is `rule_changed`, not remove+add).
+Matching keys: circles/agents/goals by `id`; pay rules by payee; mandates by `(goal, principal)`; rules by `(goal, canonical subject)` (so a changed procedure is `rule_changed`, not remove+add).
 
 `Change = {kind, path, before, after, effect: "loosens"|"tightens"|"neutral", sentence}`.
 
@@ -329,6 +348,9 @@ Matching keys: circles/agents/goals by `id`; mandates by `(goal, principal)`; ru
 | `purpose_changed`, `goal_purpose_changed`, `goal_title_changed` | neutral |
 | `membership_changed` | `open` from `invite` loosens; reverse tightens; sponsor count down loosens / up tightens |
 | `amend_changed` | stricter procedure tightens (approve count up, threshold up, `else allow`→`deny`); looser loosens; different circle or kind → neutral |
+| `margin_changed` | up or added loosens; down or removed tightens |
+| `pay_added` / `pay_removed` | loosens / tightens |
+| `pay_changed` | share or max up (and neither down) loosens; only down tightens; one up and one down → loosens |
 | `circle_added`, `circle_removed`, `circle_seats_changed`, `circle_term_changed`, `holder_added`, `holder_removed` | neutral |
 | `agent_added`, `agent_removed`, `agent_operator_changed`, `agent_runtime_changed` | neutral (runtime `byo`→`hosted` loosens) |
 | `goal_added`, `goal_removed`, `goal_steward_changed`, `goal_fund_changed`, `goal_on_underfunded_changed`, `goal_on_close_changed`, `goal_success_changed` | neutral |
@@ -346,6 +368,8 @@ Sentences (exact for tested kinds):
 - `mandate_added`: `@carol gets a new mandate on Open cloud image editor.`
 - `rule_removed`: `Open cloud image editor no longer requires approval for any spend over $500.`
 - `holder_added`: `@sam joins core.` / `holder_removed`: `@jo leaves core.`
+- `margin_changed`: `The margin rises from 10% to 15%.` (`falls` when lower; `is set to 15%` when added; `is removed` when deleted).
+- `pay_added`: `@mina is now paid 40% of earnings, up to $4,000 per month.` / `pay_removed`: `@mina is no longer paid from earnings.` / `pay_changed`: `@mina's pay changes from 40% up to $4,000 to 50% up to $3,000 per month.`
 - Other kinds: `<Thing> changes from <before> to <after>.` using charter formatting helpers.
 
-Changes are ordered: org-level first, then circles, agents, goals in `after` order (removed items last), then within a goal: goal fields, mandates, rules.
+Changes are ordered: org-level first (the margin, then pay rules in `after` order with removed ones last), then circles, agents, goals in `after` order (removed items last), then within a goal: goal fields, mandates, rules.

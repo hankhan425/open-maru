@@ -14,7 +14,7 @@ Donors give once or monthly to a goal via Stripe Checkout on the org's own accou
 - Migration `donations`.
 - `Openmaru.Payments.Donations`: `checkout/1`, webhook handlers for every event in SPEC-05 §4.2 except `account.updated`, `receipt/2`.
 - Ledger chains with deterministic ids; fee `spend_records` (source `stripe`, tier `verified`); treasury credits trigger `Funding.top_up/1`.
-- Endpoints `POST /donations/checkout` (rate-limited), `GET /donations/:id/receipt?t=`. A donation always names a goal (SPEC-05 §8.4). P04 later gates checkout by funding tier and cap.
+- Endpoints `POST /donations/checkout` (rate-limited), `GET /donations/:id/receipt?t=`. A donation always names a goal (SPEC-05 §8.3). P04 later adds the margin split, lots and the cap, and P05 the liveness gates.
 - Administrator alerts (inbox item + `members` activity) for disputes and `refund_unfunded`.
 
 ## Tests to write first
@@ -34,4 +34,4 @@ Donors give once or monthly to a goal via Stripe Checkout on the org's own accou
 - [ ] **P02-T14** 11th checkout within a minute from one IP → 429.
 
 ## Out of scope
-Reconciliation (P03), donation UI (F07), funding tiers, caps and pledges (P04), donor protections (P05).
+Reconciliation (P03), donation UI (F07), lots, margin, caps and pledges (P04), donor protections (P05).

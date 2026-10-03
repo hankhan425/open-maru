@@ -64,11 +64,11 @@ An `Authorization` header takes precedence over the session cookie: when it is p
 |---|---|---|
 | `POST /orgs/:slug/payments/onboarding` (also a replacement account, SPEC-05 §8.8) · `GET /orgs/:slug/payments/status` · `GET /orgs/:slug/payments/reconciliation` | S | P01, P03, P05 |
 | `POST /orgs/:slug/contributions {goal_id?, amount_micros, memo}` (own funds, administrators; SPEC-03 §5.6) | S P | G02 |
-| `GET /orgs/:slug/funding` → tier, per-goal conditions, outside money held and cap, liveness clock (SPEC-05 §8.1) | — | P04 |
+| `GET /orgs/:slug/funding` → what supporters see (SPEC-05 §8.11): per goal whether it takes pledges and donations (and why not), unspent outside money, cap and starting allowance, liveness; the margin, recipient, review, track record and rule flags | — | P04, P05 |
+| `GET /orgs/:slug/earnings` → pay rules, earnings and pay owed and recorded by month (SPEC-05 §8.10) · `POST /orgs/:slug/payouts/:id/paid {proof_upload_id}` · `POST /orgs/:slug/earnings/retain {amount_micros}` (administrators) | — / S P | P06 |
 | `POST /donations/checkout` · `GET /donations/:id/receipt?t=` | — | P02, P04 |
-| `POST /donations/:id/exit?t=` (during a waiting period, SPEC-05 §8.5) | — | P05 |
-| `POST /pledges/setup {goal_id, monthly_cap_micros, donor_display_name?, donor_public}` → `{setup_url, pledge_id}` · `GET /pledges/:id?t=` · `POST /pledges/:id/cancel?t=` · `POST /pledges/:id/reconfirm?t=` | — (rate-limited like checkout) | P04 |
-| `POST /pledges/:id/move?t= {goal_id}` (to a fork's goal, SPEC-05 §8.9) | — | P05 |
+| `POST /donations/:id/exit?t=` (during a waiting period, SPEC-05 §8.6) | — | P05 |
+| `POST /pledges/setup {goal_id, monthly_cap_micros, donor_display_name?, donor_public}` → `{setup_url, pledge_id}` · `GET /pledges/:id?t=` · `POST /pledges/:id/cancel?t=` · `POST /pledges/:id/reconfirm?t=` (adopts the current margin) | — (rate-limited like checkout) | P04 |
 | `POST /webhooks/stripe` · `POST /webhooks/stripe/connect` (outside `/api/v1`) | signature | P01, P02 |
 
 ### Public read models (cacheable, no auth)
@@ -102,13 +102,15 @@ Choosing between the generic codes: `invalid_request` (400) is a malformed reque
 | `handle_taken`, `slug_taken`, `account_exists`, `exit_not_open` | 409 | `payments_not_enabled`, `agent_not_hosted`, `no_compute_budget` | 409 |
 | `model_not_priced`, `unsupported_feature` | 400 | `provider_credentials_missing` | 424 |
 | `rate_limited` | 429 | `provider_error` | 502 |
-| `gateway_timeout` | 504 | `task_not_in_goal`, `operator_unavailable` | 403 |
-| `funding_tier_required`, `outside_money_cap_reached` | 409 | | |
+| `gateway_timeout` | 504 | `task_not_in_goal`, `operator_unavailable`, `custom_upstream_not_allowed` | 403 |
+| `not_accepting_money`, `outside_money_cap_reached` | 409 | | |
 | `authorization_pending`, `slow_down`, `expired_token` | 400 | `access_denied`, `invalid_grant` | 400 |
 | `not_acceptable` | 406 | `request_timeout` | 408 |
 | `conflict` | 409 | `payload_too_large` | 413 |
 | `uri_too_long` | 414 | `unsupported_media_type` | 415 |
 | `internal_error` | 500 | `service_unavailable` | 503 |
+
+`not_accepting_money` carries `details.reason`: `no_recent_work`, `dormant` or `connector_unavailable` (SPEC-05 §8.7, §8.8). `custom_upstream_not_allowed` is a gateway call through a custom `openai_base_url` while the goal holds unspent outside money (SPEC-05 §8.2).
 
 A code always determines the HTTP status, including for errors raised before or outside a controller (OQ-1). Such an error gets the code of its status: the generic `invalid_request`, `unauthenticated`, `forbidden`, `not_found`, `validation_failed` and `rate_limited` for theirs, and the last four rows of the table for the others. `conflict` is a concurrent change the server did not handle (retry the request); `internal_error` is a bug, never a domain outcome; `service_unavailable` is a dependency that is down.
 
