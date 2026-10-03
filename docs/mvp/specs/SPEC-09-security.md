@@ -32,14 +32,14 @@
 Account deletion: removes PII (email, OAuth identities, passkeys; display name cleared), revokes the user's sessions, PATs and mandate tokens, and sets `users.deleted_at`. It first makes the user leave every org they belong to, with every effect of leaving (SPEC-02 §3.6): their seats, mandates and operator roles end; nobody has to hand anything over first (OQ-16). The handle is kept and stays taken; the API and web show the account as deleted. Ledger, votes, and activity remain with that pseudonymous handle (immutable history; OQ-7).
 
 ## 5. Uploads
-Presigned PUT to private bucket; max 10 MB; allowed types: `application/pdf`, `image/png`, `image/jpeg`, `image/webp`, `text/plain`; SHA-256 verified on `complete`; object keys are random; no server-side fetching of user-provided URLs (no SSRF surface).
+Presigned PUT to private bucket; max 10 MB; allowed types: `application/pdf`, `image/png`, `image/jpeg`, `image/webp`, `text/plain`; SHA-256 verified on `complete`; object keys are random; no server-side fetching of user-provided URLs (no SSRF surface; the gateway's upstreams come from the platform's endpoint list, SPEC-06 §2.1).
 
 ## 6. Abuse and limits
 - Rate limits (Hammer): auth 10/min/IP; spec check 60/min/IP; checkout 10/min/IP; API 600/min/principal; gateway 600/min/mandate; MCP 300/min/token. Limits live in one config table and can be set per environment (e.g. `AUTH_RATE_LIMIT_PER_MINUTE` for e2e runs).
 - Client IP: "IP" means an IPv4 address or an IPv6 /64. Behind a load balancer, `x-forwarded-for` is believed only when the TCP peer is a configured trusted proxy (`TRUSTED_PROXIES`); the client is the right-most hop that is not a trusted proxy. With none configured, the header is ignored.
 - Holder consent (SPEC-02 §3.2) prevents unconsented association.
 - Joining to sway a vote: member-wide votes count only members of at least 30 days (SPEC-01 §4.7). People silent for 90 days and suspended users don't count toward decisions (SPEC-02 §3.4).
-- Outside money is protected by an honest meter, earmarked lots, a cap, a waiting period and dormancy refunds (SPEC-05 §8). Usage reported by a custom `openai_base_url` is `attested`, and such calls are refused while a goal holds unspent outside money, so a server an org controls cannot fake `verified` spend (SPEC-05 §8.2). Platform admins cannot raise a cap or lift a refusal by hand.
+- Outside money is protected by an honest meter, earmarked lots, a cap, a waiting period and dormancy refunds (SPEC-05 §8). The gateway reaches only provider endpoints on a list platform admins keep, so a server an org controls cannot fake `verified` spend (SPEC-05 §8.2, SPEC-06 §2.1). Platform admins cannot raise a cap or lift a refusal by hand.
 - Platform admins can suspend orgs (read-only public page with a notice, all spend denied `forbidden`, checkout and pledge charges disabled) and users (who then stop counting toward decisions, and whose agents are refused with `operator_unavailable`).
 - Webhooks verify Stripe signatures and tolerance window (5 min).
 

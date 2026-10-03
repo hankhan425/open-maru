@@ -460,8 +460,8 @@ ARCHITECTURE > PRD.
   5. **Own funds and outside money** (revised 2026-10-03, below). Own funds are recorded by an
      administrator as `attested` (SPEC-03 §5.6). Outside money pays for accepted work at cost plus
      the org's margin, under seven platform guarantees (SPEC-05 §8.2–§8.9):
-     - an honest meter: only spend openmaru can vouch for is `verified`; usage reported by a custom
-       `openai_base_url` is `attested`, and such calls are refused while a goal holds donations;
+     - an honest meter: only spend openmaru can vouch for is `verified`, and the gateway reaches
+       only provider endpoints on a list platform admins keep, each with its own prices;
      - earmarked donations, tracked as first-in-first-out lots that spend uses first and that earn
        margin only on accepted work;
      - pledges that pay after the fact, at cost plus margin, for accepted work that donations
@@ -521,8 +521,17 @@ ARCHITECTURE > PRD.
   SPEC-06 §3; SPEC-07; SPEC-08 §3; SPEC-09 §4, §6. Tasks: L09 (margin and pay in maru) and P06
   (earnings, pay rules, payouts) are new; P04 is renamed and rewritten (lots, margin, cap,
   pledges) and P05 rewritten; C03, C04, C06, C07, G03, P01, P02, P03, W03, F06, F07, H01, H02
-  and TASKS.md are updated. Error codes: `funding_tier_required` is replaced by `not_accepting_money`, and
-  `custom_upstream_not_allowed` is new. OQ-18 is open.
+  and TASKS.md are updated. Error codes: `funding_tier_required` is replaced by
+  `not_accepting_money`. OQ-18 is open.
+- **Follow-up (user, 2026-10-03):** the first fix for the meter hole labelled custom upstreams
+  `attested` and refused them while a goal held donations. The user asked why custom addresses
+  were allowed at all. The free-form `openai_base_url` is gone: the gateway reaches only provider
+  endpoints on a list platform admins keep, each with its own prices, and a goal picks one per
+  wire format (SPEC-06 §2). This closes the hole outright, prices hosts other than OpenAI
+  correctly, and removes a server-side fetch of a user-supplied URL (SPEC-09 §5). Self-hosted
+  models are out of scope until listed. Updated: PRD, ARCHITECTURE ADR-4, SPEC-03 §6, SPEC-05
+  §8.2, SPEC-06 §1–§3, SPEC-07, SPEC-08 §3, SPEC-09 §5–§6; tasks W01 (renamed), W02, W03, P04,
+  F08, H01.
 
 ### OQ-17: Do upfront donations stay in the MVP?
 - **Task:** OQ-16 (affects P02, P04, P05, F07, H01)

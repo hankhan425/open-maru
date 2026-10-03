@@ -169,8 +169,7 @@ SPEC-05 §8.10.
 
 | Source | Tier | Meta |
 |---|---|---|
-| gateway (default provider host) | verified | provider, model, input/output/cache tokens, provider request id, `estimated` bool |
-| gateway (custom `openai_base_url`) | attested | as above, plus `custom_upstream: true` (SPEC-05 §8.2) |
+| gateway | verified | endpoint (SPEC-06 §2.1), model, input/output/cache tokens, provider request id, `estimated` bool |
 | runtime | verified | session id, seconds, rate |
 | stripe fees | verified | charge id |
 | expense_claim with receipt | evidenced | receipt upload id |

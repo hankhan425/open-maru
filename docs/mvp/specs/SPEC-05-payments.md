@@ -85,8 +85,7 @@ People may leave or go silent at any time, and payments are non-custodial (§1):
 - **Earned money:** outside money that has paid for accepted work. It belongs to the org: cost goes to the treasury (pledges, §8.4) or has already been spent (lots, §8.3), and margin goes to earnings (§8.10).
 
 ### 8.2 Honest meter
-Only spend measured where openmaru can vouch for it is `verified`: gateway calls to the default Anthropic and OpenAI hosts, hosted-runtime time, and Stripe fees (SPEC-03 §6). Anything else is a claim and labelled as one:
-- A gateway call through a goal's custom `openai_base_url` posts as `attested` with `meta.custom_upstream = true`, because a server the org may control reports its usage (SPEC-06 §3.3). While the goal has U > 0, such calls are refused with 403 `custom_upstream_not_allowed`, so a self-reported meter never spends donors' money.
+Only spend measured where openmaru can vouch for it is `verified`: gateway calls, hosted-runtime time, and Stripe fees (SPEC-03 §6). The gateway reaches only provider endpoints on a list that platform admins keep, each priced on its own (SPEC-06 §2), so an org cannot run a server that reports usage nobody was billed for. Anything else is a claim and labelled as one:
 - An expense claim on a goal with U > 0 needs a receipt: 422 `validation_failed`, `details.reason: "receipt_required"`.
 - Spend posted as `estimated` (the full hold, SPEC-06 §3.4) stays `verified` but is not accepted spend.
 

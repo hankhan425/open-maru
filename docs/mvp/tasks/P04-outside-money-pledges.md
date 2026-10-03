@@ -4,7 +4,7 @@
 |---|---|---|---|
 | Payments | P02, M02, A02, G03, L09 | L | 12 |
 
-**Read first:** OPEN_QUESTIONS OQ-16; SPEC-05 §1, §4, §5, §8.1–§8.5, §8.9, §8.11; SPEC-01 §4.9 (margin); SPEC-03 §3, §5.5, §5.7, §5.8; SPEC-06 §3.1, §3.3 (custom upstream); SPEC-07 payments rows.
+**Read first:** OPEN_QUESTIONS OQ-16; SPEC-05 §1, §4, §5, §8.1–§8.5, §8.9, §8.11; SPEC-01 §4.9 (margin); SPEC-03 §3, §5.5, §5.7, §5.8; SPEC-07 payments rows.
 **Paths:** `lib/openmaru/funding/**`, `lib/openmaru/payments/pledges/**`, controllers, migrations, Oban workers
 
 ## Goal
@@ -12,9 +12,7 @@ Outside money pays for accepted work at cost plus the org's margin, and for noth
 
 ## Deliverables
 - **Accepted spend.** `Openmaru.Funding.accepted_spend(goal, month)` (SPEC-05 §8.1).
-- **Honest meter** (SPEC-05 §8.2).
-  - The gateway refuses a call through a custom `openai_base_url` while the goal has U > 0: 403 `custom_upstream_not_allowed` (W03 posts such spend as `attested`).
-  - An expense claim on a goal with U > 0 needs a receipt: 422 `validation_failed`, `details.reason: "receipt_required"` (extends G03).
+- **Receipts** (SPEC-05 §8.2). An expense claim on a goal with U > 0 needs a receipt: 422 `validation_failed`, `details.reason: "receipt_required"` (extends G03). The rest of the honest meter is W01's endpoint list.
 - **Lots and margin** (SPEC-05 §8.3).
   - Migrations `outside_money_lots` and `lot_consumptions`, and `donations.margin_bps`.
   - P02's donation chain gains the margin split: code 8 into `goal:<g>:margin_held`.
@@ -49,7 +47,7 @@ Outside money pays for accepted work at cost plus the org's margin, and for noth
 - [ ] **P04-T01** Accepted spend:
   - Counted in September: verified spend on a task accepted in September, even if the spend posted in August.
   - Counted in October: spend that posts in October on a task accepted in September.
-  - Excluded: spend on a rejected task, spend with no task, `estimated`, `attested` (a custom upstream, an expense without a receipt) and `evidenced` spend.
+  - Excluded: spend on a rejected task, spend with no task, `estimated`, `attested` (an expense without a receipt) and `evidenced` spend.
 - [ ] **P04-T02** Donation split, with `margin: 15%`:
   - A $115 donation sends $100 to goal funds (code 1) and $15 to `margin_held` (code 8); fees come out of goal funds.
   - The lot is cost 100, margin 15, `margin_bps` 1500.
@@ -69,9 +67,7 @@ Outside money pays for accepted work at cost plus the org's margin, and for noth
   - With U = $9,500, a $1,000 checkout → 409 `outside_money_cap_reached`.
   - In a new org with no accepted spend: a $1,000 checkout succeeds under the allowance, and a further $1 → 409.
   - When the cap is reached, monthly donations pause (mock); after spend lowers U, they resume.
-- [ ] **P04-T07** Honest meter:
-  - A goal with a custom `openai_base_url` and U > 0: a gateway call → 403 `custom_upstream_not_allowed` in the OpenAI envelope. With U = 0, it goes through and posts `attested`.
-  - An expense without a receipt on a goal with U > 0 → 422 `receipt_required`. With U = 0 → posted `attested` as before.
+- [ ] **P04-T07** An expense without a receipt on a goal with U > 0 → 422 `receipt_required`. With U = 0 → posted `attested` as before.
 - [ ] **P04-T08** Pledge setup:
   - It creates a platform `setup` session (mock). The pledge is `pending` until the webhook, then `active` with the current `margin_bps`.
   - A cap outside $1–$10,000 → 422. `charges_enabled` false → 409 `payments_not_enabled`. Rate-limited like checkout.

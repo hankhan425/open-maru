@@ -63,7 +63,7 @@ Sizes: **S** ≤ ½ day, **M** ≈ 1 day, **L** ≈ 2–3 days of focused agent 
 | [P04](P04-outside-money-pledges.md) | Outside money: lots, margin, cap, pledges | Payments | P02, M02, A02, G03, L09 | L |
 | [P05](P05-donor-protections.md) | Donor protections: waiting period, exit, liveness, continuity | Payments | P04, C06, C07 | L |
 | [P06](P06-earnings-pay.md) | Earnings, pay rules, payouts | Payments | P04, L09, C07 | M |
-| [W01](W01-secrets-prices.md) | Goal secrets & price catalog | Gateway | C02, C03 | M |
+| [W01](W01-secrets-prices.md) | Goal secrets, provider endpoints & price catalog | Gateway | C02, C03 | M |
 | [W02](W02-anthropic-gateway.md) | Anthropic Messages gateway | Gateway | W01, M02 | L |
 | [W03](W03-openai-gateway.md) | OpenAI Chat Completions gateway | Gateway | W02 | M |
 | [A01](A01-tasks-leases.md) | Tasks & leases | Agents | C03, C05, M01 | M |

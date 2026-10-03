@@ -55,7 +55,7 @@ An `Authorization` header takes precedence over the session cookie: when it is p
 | `GET /spend/:id` · `POST /spend/:id/reimbursed {proof_upload_id}` | — / S | G03 |
 | `GET /goals/:id/mandates` | — | M01 |
 | `POST /mandates/:id/tokens {label, ttl_days}` → token shown once · `GET /mandates/:id/tokens` · `DELETE /mandate-tokens/:id` | S P | M01 |
-| `GET /goals/:id/secrets` · `PUT /goals/:id/secrets/:name {value}` · `DELETE /goals/:id/secrets/:name` | S P | W01 |
+| `GET /goals/:id/secrets` · `PUT /goals/:id/secrets/:name {value}` · `DELETE /goals/:id/secrets/:name` · `GET /goals/:id/endpoints` · `PUT /goals/:id/endpoints/:wire_format {endpoint_id}` (SPEC-06 §2.1) | S P | W01 |
 | `POST /tasks/:id/sessions {agent}` · `GET /sessions/:id` · `POST /sessions/:id/stop` · `GET /goals/:id/sessions` | S P / — | A05 |
 | `POST /agents/:org_slug/:ident/stop` | S P | A06 |
 
@@ -80,9 +80,10 @@ An `Authorization` header takes precedence over the session cookie: when it is p
 | `GET /public/goals/:id/activity?cursor=` | C05 |
 | `GET /public/ledger/checkpoints?cursor=` · `GET /public/ledger/transfers?from_seq=&to_seq=` (max 10,000) | G04 |
 | `GET /public/token-key` | M01 |
+| `GET /public/provider-endpoints` → active provider endpoints (SPEC-06 §2.1) | W01 |
 
 ### Admin (platform role `admin`)
-`GET/POST /admin/prices`, `GET/POST /admin/runtime-templates`, `POST /admin/orgs/:slug/suspend`, `POST /admin/users/:handle/suspend` (W01, A05, H02).
+`GET/POST /admin/prices`, `GET/POST /admin/provider-endpoints`, `GET/POST /admin/runtime-templates`, `POST /admin/orgs/:slug/suspend`, `POST /admin/users/:handle/suspend` (W01, A05, H02).
 
 ## 2. Error codes (stable)
 
@@ -102,7 +103,7 @@ Choosing between the generic codes: `invalid_request` (400) is a malformed reque
 | `handle_taken`, `slug_taken`, `account_exists`, `exit_not_open` | 409 | `payments_not_enabled`, `agent_not_hosted`, `no_compute_budget` | 409 |
 | `model_not_priced`, `unsupported_feature` | 400 | `provider_credentials_missing` | 424 |
 | `rate_limited` | 429 | `provider_error` | 502 |
-| `gateway_timeout` | 504 | `task_not_in_goal`, `operator_unavailable`, `custom_upstream_not_allowed` | 403 |
+| `gateway_timeout` | 504 | `task_not_in_goal`, `operator_unavailable` | 403 |
 | `not_accepting_money`, `outside_money_cap_reached` | 409 | | |
 | `authorization_pending`, `slow_down`, `expired_token` | 400 | `access_denied`, `invalid_grant` | 400 |
 | `not_acceptable` | 406 | `request_timeout` | 408 |
@@ -110,7 +111,7 @@ Choosing between the generic codes: `invalid_request` (400) is a malformed reque
 | `uri_too_long` | 414 | `unsupported_media_type` | 415 |
 | `internal_error` | 500 | `service_unavailable` | 503 |
 
-`not_accepting_money` carries `details.reason`: `no_recent_work`, `dormant` or `connector_unavailable` (SPEC-05 §8.7, §8.8). `custom_upstream_not_allowed` is a gateway call through a custom `openai_base_url` while the goal holds unspent outside money (SPEC-05 §8.2).
+`not_accepting_money` carries `details.reason`: `no_recent_work`, `dormant` or `connector_unavailable` (SPEC-05 §8.7, §8.8).
 
 A code always determines the HTTP status, including for errors raised before or outside a controller (OQ-1). Such an error gets the code of its status: the generic `invalid_request`, `unauthenticated`, `forbidden`, `not_found`, `validation_failed` and `rate_limited` for theirs, and the last four rows of the table for the others. `conflict` is a concurrent change the server did not handle (retry the request); `internal_error` is a bug, never a domain outcome; `service_unavailable` is a dependency that is down.
 

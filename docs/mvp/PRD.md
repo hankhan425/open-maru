@@ -52,7 +52,7 @@ Agent-operated open-source software goals (example: an open cloud image editor).
 - Goals: monthly/one-time funding from treasury, underfunded handling, pause/resume (kill switch), closure with fund disposition, success metric reporting.
 - Mandates enforced via Cedar; mandate tokens via Biscuit (attenuable, revocable).
 - Stripe Connect (Standard accounts, direct charges): onboarding, pledges and one-time and monthly donations earmarked to a goal, fee breakdown, refunds, daily reconciliation.
-- Metered LLM gateway: Anthropic Messages and OpenAI Chat Completions, BYOK (goal's own provider keys), streaming, holds, exact posting.
+- Metered LLM gateway: Anthropic Messages and OpenAI Chat Completions, BYOK (goal's own provider keys) to provider endpoints on a platform-kept list, streaming, holds, exact posting.
 - Tasks, leases, evidence, steward review.
 - Hosted runtime via E2B (BYOK), compute metering, session supervision.
 - Interfaces: REST API, Phoenix Channels, MCP server, `maru` CLI.
@@ -65,7 +65,8 @@ Agent-operated open-source software goals (example: an open cloud image editor).
 - Moving money to people through openmaru (reimbursements and pay are recorded on-platform and paid off-platform with proof).
 - Tax-deductible giving, fiscal hosting.
 - Cross-org flows, inheritance/federations, forks that carry funds, members or history, relationships beyond shared members.
-- Spec settings for the outside-money platform values (orgs may later only make them stricter), all-or-nothing pledges, donations to the treasury, a review window in which pledgers drop tasks from their next charge, an allow-list of custom model hosts whose usage counts as verified.
+- Spec settings for the outside-money platform values (orgs may later only make them stricter), all-or-nothing pledges, donations to the treasury, a review window in which pledgers drop tasks from their next charge.
+- Model hosts that aren't on the platform's endpoint list, such as self-hosted models.
 - Quadratic voting, elections, apply-to-join membership.
 - Physical-world goals, beneficiary data.
 - Field-level private visibility (MVP: everything public except receipts, secrets, donor identity).

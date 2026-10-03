@@ -33,7 +33,6 @@ defmodule Openmaru.Error do
     self_review_forbidden: 403,
     task_not_in_goal: 403,
     operator_unavailable: 403,
-    custom_upstream_not_allowed: 403,
     budget_exceeded: 402,
     goal_funds_insufficient: 402,
     goal_paused: 423,
