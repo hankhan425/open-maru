@@ -29,7 +29,8 @@ An `Authorization` header takes precedence over the session cookie: when it is p
 | `GET /orgs/:slug` (org, active version summary, circles with effective holders, goals, member count) | — | C03 |
 | `GET /orgs/:slug/spec` (source, ir, charter, hash, version) · `GET /orgs/:slug/spec/versions[/:n]` | — | C03 |
 | `POST /orgs/:slug/holders/accept`, `POST /orgs/:slug/holders/decline` | S P | C03 |
-| `POST /orgs/:slug/membership` · `DELETE /orgs/:slug/membership` · `POST /orgs/:slug/sponsorships {handle}` | S P | C03 |
+| `POST /orgs/:slug/membership` · `DELETE /orgs/:slug/membership` (leaving; holders and operators too, SPEC-02 §3.6) · `POST /orgs/:slug/sponsorships {handle}` | S P | C03, C07 |
+| `POST /orgs/:slug/forks {slug, source}` → new org (SPEC-02 §3.7) | S P | C07 |
 | `POST /orgs/:slug/proposals {source, base_version, title, rationale}` | S P | C04 |
 | `GET /orgs/:slug/proposals?status=` · `GET /decisions/:id` | — | C04 |
 | `POST /decisions/:id/ballots {choice}` · `POST /decisions/:id/cancel` | S P | C04 |
@@ -54,15 +55,20 @@ An `Authorization` header takes precedence over the session cookie: when it is p
 | `GET /spend/:id` · `POST /spend/:id/reimbursed {proof_upload_id}` | — / S | G03 |
 | `GET /goals/:id/mandates` | — | M01 |
 | `POST /mandates/:id/tokens {label, ttl_days}` → token shown once · `GET /mandates/:id/tokens` · `DELETE /mandate-tokens/:id` | S P | M01 |
-| `GET /goals/:id/secrets` · `PUT /goals/:id/secrets/:name {value}` · `DELETE /goals/:id/secrets/:name` | S P | W01 |
+| `GET /goals/:id/secrets` · `PUT /goals/:id/secrets/:name {value}` · `DELETE /goals/:id/secrets/:name` · `GET /goals/:id/endpoints` · `PUT /goals/:id/endpoints/:wire_format {endpoint_id}` (SPEC-06 §2.1) | S P | W01 |
 | `POST /tasks/:id/sessions {agent}` · `GET /sessions/:id` · `POST /sessions/:id/stop` · `GET /goals/:id/sessions` | S P / — | A05 |
 | `POST /agents/:org_slug/:ident/stop` | S P | A06 |
 
 ### Payments
 | Method & path | Auth | Owner |
 |---|---|---|
-| `POST /orgs/:slug/payments/onboarding` · `GET /orgs/:slug/payments/status` · `GET /orgs/:slug/payments/reconciliation` | S | P01, P03 |
-| `POST /donations/checkout` · `GET /donations/:id/receipt?t=` | — | P02 |
+| `POST /orgs/:slug/payments/onboarding` (also a replacement account, SPEC-05 §8.8) · `GET /orgs/:slug/payments/status` · `GET /orgs/:slug/payments/reconciliation` | S | P01, P03, P05 |
+| `POST /orgs/:slug/contributions {goal_id?, amount_micros, memo}` (own funds, administrators; SPEC-03 §5.6) | S P | G02 |
+| `GET /orgs/:slug/funding` → what supporters see (SPEC-05 §8.11): per goal whether it takes pledges and donations (and why not), unspent outside money, cap and starting allowance, liveness; the margin, recipient, review, track record and rule flags | — | P04, P05 |
+| `GET /orgs/:slug/earnings` → pay rules, earnings and pay owed and recorded by month (SPEC-05 §8.10) · `POST /orgs/:slug/payouts/:id/paid {proof_upload_id}` · `POST /orgs/:slug/earnings/retain {amount_micros}` (administrators) | — / S P | P06 |
+| `POST /donations/checkout` · `GET /donations/:id/receipt?t=` | — | P02, P04 |
+| `POST /donations/:id/exit?t=` (during a waiting period, SPEC-05 §8.6) | — | P05 |
+| `POST /pledges/setup {goal_id, monthly_cap_micros, donor_display_name?, donor_public}` → `{setup_url, pledge_id}` · `GET /pledges/:id?t=` · `POST /pledges/:id/cancel?t=` · `POST /pledges/:id/reconfirm?t=` (adopts the current margin) | — (rate-limited like checkout) | P04 |
 | `POST /webhooks/stripe` · `POST /webhooks/stripe/connect` (outside `/api/v1`) | signature | P01, P02 |
 
 ### Public read models (cacheable, no auth)
@@ -74,9 +80,10 @@ An `Authorization` header takes precedence over the session cookie: when it is p
 | `GET /public/goals/:id/activity?cursor=` | C05 |
 | `GET /public/ledger/checkpoints?cursor=` · `GET /public/ledger/transfers?from_seq=&to_seq=` (max 10,000) | G04 |
 | `GET /public/token-key` | M01 |
+| `GET /public/provider-endpoints` → active provider endpoints (SPEC-06 §2.1) | W01 |
 
 ### Admin (platform role `admin`)
-`GET/POST /admin/prices`, `GET/POST /admin/runtime-templates`, `POST /admin/orgs/:slug/suspend`, `POST /admin/users/:handle/suspend` (W01, A05, H02).
+`GET/POST /admin/prices`, `GET/POST /admin/provider-endpoints`, `GET/POST /admin/runtime-templates`, `POST /admin/orgs/:slug/suspend`, `POST /admin/users/:handle/suspend` (W01, A05, H02).
 
 ## 2. Error codes (stable)
 
@@ -93,13 +100,22 @@ Choosing between the generic codes: `invalid_request` (400) is a malformed reque
 | `not_found` | 404 | `invalid_request` | 400 |
 | `validation_failed` | 422 | `goal_closed`, `invalid_transition`, `stale_proposal` | 409 |
 | `already_voted`, `decision_closed`, `lease_limit_reached`, `lease_expired` | 409 | `evidence_required`, `exceeds_hold`, `idempotency_conflict` | 409 |
-| `handle_taken`, `slug_taken`, `must_be_removed_by_amendment`, `account_exists` | 409 | `payments_not_enabled`, `agent_not_hosted`, `no_compute_budget` | 409 |
+| `handle_taken`, `slug_taken`, `account_exists`, `exit_not_open` | 409 | `payments_not_enabled`, `agent_not_hosted`, `no_compute_budget` | 409 |
 | `model_not_priced`, `unsupported_feature` | 400 | `provider_credentials_missing` | 424 |
 | `rate_limited` | 429 | `provider_error` | 502 |
-| `gateway_timeout` | 504 | `task_not_in_goal` | 403 |
+| `gateway_timeout` | 504 | `task_not_in_goal`, `operator_unavailable` | 403 |
+| `not_accepting_money`, `outside_money_cap_reached` | 409 | | |
 | `authorization_pending`, `slow_down`, `expired_token` | 400 | `access_denied`, `invalid_grant` | 400 |
+| `not_acceptable` | 406 | `request_timeout` | 408 |
+| `conflict` | 409 | `payload_too_large` | 413 |
+| `uri_too_long` | 414 | `unsupported_media_type` | 415 |
+| `internal_error` | 500 | `service_unavailable` | 503 |
 
-The last row is the device login (`/auth/device/*`, RFC 8628 §3.5): `authorization_pending` (not approved yet), `slow_down` (polled less than `interval` seconds after the previous poll; the interval restarts), `expired_token` (code older than 10 minutes), `access_denied` (denied, or the approver is suspended), `invalid_grant` (unknown device code, or its token was already issued; on approve, a code already decided). An unknown user code on approve is 404 `not_found`.
+`not_accepting_money` carries `details.reason`: `no_recent_work`, `dormant` or `connector_unavailable` (SPEC-05 §8.7, §8.8).
+
+A code always determines the HTTP status, including for errors raised before or outside a controller (OQ-1). Such an error gets the code of its status: the generic `invalid_request`, `unauthenticated`, `forbidden`, `not_found`, `validation_failed` and `rate_limited` for theirs, and the last four rows of the table for the others. `conflict` is a concurrent change the server did not handle (retry the request); `internal_error` is a bug, never a domain outcome; `service_unavailable` is a dependency that is down.
+
+The `authorization_pending` row is the device login (`/auth/device/*`, RFC 8628 §3.5): `authorization_pending` (not approved yet), `slow_down` (polled less than `interval` seconds after the previous poll; the interval restarts), `expired_token` (code older than 10 minutes), `access_denied` (denied, or the approver is suspended), `invalid_grant` (unknown device code, or its token was already issued; on approve, a code already decided). An unknown user code on approve is 404 `not_found`.
 
 ## 3. Realtime (Phoenix Channels, `/socket`)
 

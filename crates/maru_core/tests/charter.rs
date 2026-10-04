@@ -165,7 +165,7 @@ fn l04_t08_amend_sentences() {
     // vote members / deny
     assert_eq!(
         p("vote(members, 1/2) within 48h else deny"),
-        "Changes need a vote of all members, passing with at least half of them in favour within 48 hours. If the vote does not pass in time, the change is rejected."
+        "Changes need a vote of all members in which at least 20% vote, passing with at least half of the votes cast in favour within 48 hours. If the vote does not pass in time, the change is rejected."
     );
     // approve / deny, 1 holder (default timeout) and 2 holders
     assert_eq!(
@@ -183,7 +183,7 @@ fn l04_t08_amend_sentences() {
     );
     assert_eq!(
         p("vote(members, 3/5) within 30m else allow"),
-        "Changes need a vote of all members, passing with at least 3/5 of them in favour within 30 minutes. If not decided in time, the change is applied."
+        "Changes need a vote of all members in which at least 20% vote, passing with at least 3/5 of the votes cast in favour within 30 minutes. If not decided in time, the change is applied."
     );
     assert_eq!(
         p("approve(core, 2) within 1y else allow"),
@@ -473,10 +473,10 @@ fn l04_t15_rule_sentences() {
             "Any spend needs approval from 1 holder of core within 7 days; otherwise it is denied.",
             "Any spend over $500 needs approval from 2 holders of core within 48 hours; otherwise it is denied.",
             "Any AI-model spend needs a vote of core, passing with at least half of its holders in favour within 1 day; otherwise it is allowed.",
-            "Any AI-model spend over $0.50 needs a vote of all members, passing with at least 3/5 of them in favour within 7 days; otherwise it is denied.",
+            "Any AI-model spend over $0.50 needs a vote of all members in which at least 20% vote, passing with at least 3/5 of the votes cast in favour within 7 days; otherwise it is denied.",
             "Any compute spend needs approval from 1 holder of core within 30 minutes; otherwise it is allowed.",
             "Any compute spend over $1,000 needs approval from 1 holder of core within 7 days; otherwise it is denied.",
-            "Any expense needs a vote of all members, passing with at least 60% of them in favour within 2 weeks; otherwise it is denied.",
+            "Any expense needs a vote of all members in which at least 20% vote, passing with at least 60% of the votes cast in favour within 2 weeks; otherwise it is denied.",
             "Any expense over $12.50 needs approval from 1 holder of core within 1 hour; otherwise it is allowed.",
             "Closing this goal needs approval from 1 holder of core within 7 days; otherwise it stays open.",
         ]
@@ -496,7 +496,7 @@ fn l04_t15_rule_sentences() {
             "Rules"
         ),
         [
-            "Closing this goal needs a vote of all members, passing with at least one-third of them in favour within 1 week; otherwise it stays open."
+            "Closing this goal needs a vote of all members in which at least 20% vote, passing with at least one-third of the votes cast in favour within 1 week; otherwise it stays open."
         ]
     );
 }

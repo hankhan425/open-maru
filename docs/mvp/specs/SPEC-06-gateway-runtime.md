@@ -4,11 +4,20 @@
 
 Table `goal_secrets(goal_id, name, ciphertext, last4, updated_by_user_id, updated_at)`; unique(`goal_id`,`name`). Encrypted with Cloak (AES-256-GCM, key from `OPENMARU_VAULT_KEY`, key id stored for rotation).
 
-Allowed names: `anthropic_api_key`, `openai_api_key`, `openai_base_url` (https only), `e2b_api_key`, `github_token`. Write-only over the API (`PUT`, `DELETE`, list returns names + last4 + updated_at). Requires `ManageSecrets` (steward holders). Secrets are decrypted only inside the gateway/runtime process that uses them and are never logged.
+Allowed names: `anthropic_api_key`, `openai_api_key`, `e2b_api_key`, `github_token`. Write-only over the API (`PUT`, `DELETE`, list returns names + last4 + updated_at). Requires `ManageSecrets` (steward holders). Secrets are decrypted only inside the gateway/runtime process that uses them and are never logged.
 
-## 2. Price catalog
+## 2. Provider endpoints and prices
 
-`model_prices(provider, model, input_per_mtok_micros, output_per_mtok_micros, cache_write_per_mtok_micros, cache_read_per_mtok_micros, max_output_tokens, effective_from, effective_to null)` and `server_tool_prices(provider, tool_type, per_use_micros)`. Prices are micro-USD per million tokens (e.g. $3/MTok = `3_000_000`). Managed by platform admins (`/api/v1/admin/prices`). No prices are hardcoded; tests use fixtures.
+### 2.1 Provider endpoints
+The gateway reaches only provider endpoints on a list that platform admins keep. An org cannot point it at an address of its own, so every model call is measured by a provider that bills the org independently, and its spend can be `verified` (SPEC-05 §8.2). The server never fetches a URL a user supplied (SPEC-09 §5).
+- Table `provider_endpoints(id, name, wire_format, base_url, active)`. `id` is a short slug (`anthropic`, `openai`). `wire_format` is `anthropic_messages` or `openai_chat`. `base_url` must use `https` in production; dev, test and e2e may point an endpoint at a local stub.
+- Seeded with `anthropic` (`https://api.anthropic.com`, `anthropic_messages`) and `openai` (`https://api.openai.com`, `openai_chat`). Platform admins add others, such as OpenAI-compatible hosts that bill the key's owner, each with its own prices (§2.2): `GET/POST /api/v1/admin/provider-endpoints`. Anyone can list the active ones: `GET /api/v1/public/provider-endpoints`.
+- A goal uses one endpoint per wire format: table `goal_endpoints(goal_id, wire_format, endpoint_id)`, unique (`goal_id`, `wire_format`). Without a row the format's seeded endpoint is used.
+- A steward holder chooses with `PUT /goals/:id/endpoints/:wire_format {endpoint_id}` (`ManageSecrets`). The endpoint must be active and of that format (else 422). The goal's key for the format (`anthropic_api_key` or `openai_api_key`) goes to the chosen endpoint, so it must be that provider's key.
+- A deactivated endpoint can't be chosen. Calls through it are refused with `provider_credentials_missing`, `details.reason: "endpoint_inactive"`.
+
+### 2.2 Price catalog
+`model_prices(endpoint_id, model, input_per_mtok_micros, output_per_mtok_micros, cache_write_per_mtok_micros, cache_read_per_mtok_micros, max_output_tokens, effective_from, effective_to null)` and `server_tool_prices(endpoint_id, tool_type, per_use_micros)`. Prices are per endpoint because providers charge differently for the same model. They are micro-USD per million tokens (e.g. $3/MTok = `3_000_000`). Managed by platform admins (`/api/v1/admin/prices`). No prices are hardcoded; tests use fixtures.
 
 `cost(tokens, price) = ceil(tokens × price / 1_000_000)` computed per component, then summed.
 
@@ -25,8 +34,8 @@ Agents configure e.g. Claude Code with `ANTHROPIC_BASE_URL=<host>/gw/anthropic` 
 ### 3.1 Request pipeline
 1. Extract token (`x-api-key` or `Authorization: Bearer`); verify as mandate token with `operation("gateway")`; optional `x-openmaru-task` must be a task of the token's goal (`task_not_in_goal`).
 2. Rate limit per mandate (default 600 req/min) → `rate_limited`.
-3. Load provider secret for the goal → else `provider_credentials_missing`.
-4. Parse body; model must be priced (`model_not_priced`). Validate features (§3.2, §3.3).
+3. Load the goal's endpoint for the route's wire format (§2.1) and its provider secret → else `provider_credentials_missing`.
+4. Parse body; model must be priced for that endpoint (`model_not_priced`). Validate features (§3.2, §3.3).
 5. Compute **hold** (upper bound, §3.2/§3.3).
 6. `Spend.request(category=llm, amount=hold, source=gateway, wait_for_approval?=false, hold_timeout=900)`. Denials map to errors (§3.5).
 7. Register the request in `Gateway.InFlight` (keys `{:goal, id}`, `{:mandate, id}`) for kill-switch aborts.
@@ -38,7 +47,7 @@ Agents configure e.g. Claude Code with `ANTHROPIC_BASE_URL=<host>/gw/anthropic` 
 - Hold = `ceil(body_bytes × max(input, cache_write) / 1e6) + ceil(max_tokens × output / 1e6) + server_tool_hold`. Body bytes bound input tokens (every token is ≥ 1 byte), so the hold is a true upper bound.
 - Server tools: entries in `tools` with a `type` other than a custom tool. `web_search_*` is allowed if priced: if `max_uses` is absent the gateway injects `max_uses: 5`; `server_tool_hold = max_uses × per_use`. Any other server tool → `unsupported_feature`.
 - Usage: non-stream from `usage`; stream from `message_start.message.usage` (input, cache creation, cache read) and the last `message_delta.usage` (cumulative output; server tool use counts). Cost = input×input_price + cache_creation×cache_write + cache_read×cache_read_price + output×output_price + web_search_requests×per_use.
-- Forward headers: `anthropic-version`, `anthropic-beta`, `content-type`. Upstream auth: `x-api-key: <goal secret>`. Strip client auth headers and hop-by-hop headers.
+- Upstream: the goal's `anthropic_messages` endpoint (§2.1). Forward headers: `anthropic-version`, `anthropic-beta`, `content-type`. Upstream auth: `x-api-key: <goal secret>`. Strip client auth headers and hop-by-hop headers.
 
 ### 3.3 OpenAI Chat Completions
 - Output cap = `max_completion_tokens` ‖ `max_tokens` ‖ catalog `max_output_tokens`; multiplied by `n` (default 1, max 4 → else `invalid_request`).
@@ -46,7 +55,7 @@ Agents configure e.g. Claude Code with `ANTHROPIC_BASE_URL=<host>/gw/anthropic` 
 - `web_search_options` present → `unsupported_feature`.
 - Streaming: the gateway sets `stream_options.include_usage = true`. If the client did not request it, the final usage-only chunk is consumed and **not** forwarded.
 - Cost = (prompt − cached)×input + cached×cache_read + completion×output (`completion_tokens` includes reasoning tokens).
-- Upstream base URL: goal secret `openai_base_url` or `https://api.openai.com`. Auth `Authorization: Bearer <goal secret>`.
+- Upstream: the goal's `openai_chat` endpoint (§2.1). Auth `Authorization: Bearer <goal secret>`.
 
 ### 3.4 Failure handling
 | Situation | Behavior |
@@ -65,7 +74,7 @@ Anthropic routes: `{"type":"error","error":{"type":"<anthropic type>","message":
 |---|---|---|
 | `invalid_token` | 401 | `authentication_error` |
 | `budget_exceeded`, `goal_funds_insufficient` | 402 | `permission_error` |
-| `approval_required`, `no_mandate`, `category_not_permitted`, `per_request_exceeded`, `mandate_expired`, `mandate_revoked`, `task_not_in_goal` | 403 | `permission_error` |
+| `approval_required`, `no_mandate`, `category_not_permitted`, `per_request_exceeded`, `mandate_expired`, `mandate_revoked`, `task_not_in_goal`, `operator_unavailable` | 403 | `permission_error` |
 | `goal_paused` | 423 | `permission_error` |
 | `model_not_priced`, `unsupported_feature`, `invalid_request` | 400 | `invalid_request_error` |
 | `provider_credentials_missing` | 424 | `api_error` |

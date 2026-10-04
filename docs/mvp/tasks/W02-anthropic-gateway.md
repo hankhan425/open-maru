@@ -12,7 +12,7 @@ Any Anthropic-compatible client (e.g. Claude Code with `ANTHROPIC_BASE_URL` poin
 
 ## Deliverables
 - Streaming reverse proxy (Finch `stream/5`, chunked Plug response) at `/gw/anthropic/v1/messages` and pass-through `/gw/anthropic/v1/messages/count_tokens`.
-- `Openmaru.Gateway.Upstream` behaviour (for Bypass in tests / real Finch in prod).
+- `Openmaru.Gateway.Upstream` behaviour (for Bypass in tests / real Finch in prod). The upstream is the goal's `anthropic_messages` endpoint (W01, SPEC-06 §2.1), and prices are that endpoint's; tests point the endpoint's base URL at Bypass.
 - SSE tap parsing `message_start` / `message_delta` / `message_stop` usage without buffering beyond one event.
 - Hold computation, web-search `max_uses` injection, server-tool rejection.
 - `Openmaru.Gateway.InFlight` Registry (`{:goal, id}`, `{:mandate, id}`) + abort message handling.

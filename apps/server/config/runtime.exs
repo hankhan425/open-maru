@@ -109,19 +109,20 @@ if config_env() == :prod do
     rp_name: "openmaru",
     origin: web_url
 
-  # A key of its own, so rotating SECRET_KEY_BASE leaves audit IP hashes comparable.
+  # Seals the daily keys of the audit log's IP hashes, which live in the database
+  # (SPEC-09 §7). A secret of its own: rotating it makes every earlier hash unlinkable.
   audit_ip_hash_key =
     System.get_env("AUDIT_IP_HASH_KEY") ||
       raise """
       environment variable AUDIT_IP_HASH_KEY is missing.
-      It keys the audit log's IP hashes (SPEC-09 §7). Generate one with: mix phx.gen.secret
+      It seals the audit log's IP hash keys (SPEC-09 §7). Generate one with: mix phx.gen.secret
       """
 
   if byte_size(audit_ip_hash_key) < 32 do
     raise "AUDIT_IP_HASH_KEY must be at least 32 bytes"
   end
 
-  config :openmaru, Openmaru.Audit, ip_hash_key: audit_ip_hash_key
+  config :openmaru, Openmaru.Audit, ip_key_wrapping_key: audit_ip_hash_key
 
   config :openmaru, OpenmaruWeb.Endpoint,
     url: [host: host, port: 443, scheme: "https"],

@@ -15,6 +15,10 @@ use crate::ir::{
     Underfunded,
 };
 
+/// The share of eligible members who must vote for a `vote(members, …)` to count, as
+/// stated in the charter (SPEC-01 §4.7). A platform rule, not a spec setting (OQ-16).
+pub const MEMBER_VOTE_MIN_TURNOUT_PERCENT: u32 = 20;
+
 /// One charter section: a heading and the paragraphs and bullets under it.
 ///
 /// Every string is Markdown inline text: ids are set in `**bold**`, and text taken from
@@ -394,7 +398,8 @@ fn procedure(p: &Procedure) -> String {
             circle: None,
             threshold: t,
         } => format!(
-            "a vote of all members, passing with at least {} of them in favour",
+            "a vote of all members in which at least {MEMBER_VOTE_MIN_TURNOUT_PERCENT}% vote, \
+             passing with at least {} of the votes cast in favour",
             threshold(t.num, t.den, t.percent)
         ),
     }

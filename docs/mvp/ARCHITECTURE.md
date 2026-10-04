@@ -83,6 +83,7 @@ openmaru/
 | `Openmaru.Ledger` | accounts, transfers, balances, hash chain, checkpoints. **No other module touches ledger tables.** | `create_accounts/1`, `create_transfers/1`, `lookup_*` |
 | `Openmaru.Spend` | spend records (control-plane metadata over ledger transfers), provenance, expense claims | `record/1`, `post/2`, `void/2` |
 | `Openmaru.Payments` | Stripe accounts, donations, webhooks, refunds, reconciliation | `onboarding_link/1`, `checkout/1`, `handle_event/1` |
+| `Openmaru.Funding` | outside money (SPEC-05 §8): accepted spend, lots and margin, caps, pledges, liveness, earnings and pay, what supporters see | `accepted_spend/2`, `charge_pledges/1`, `run_pay/1`, `disclosures/1` |
 | `Openmaru.Gateway` | price catalog, provider adapters, metering, goal secrets | `price/2`, `proxy/…` |
 | `Openmaru.Runtime` | sessions, runtime adapters (E2B), compute metering, supervision | `start_session/2`, `stop_session/2` |
 | `Openmaru.Activity` | append-only activity events + PubSub broadcast | `emit/1`, `list/2` |
@@ -97,16 +98,22 @@ Rules: contexts call each other only through public functions. Cross-context wri
 
 **Metered model call.** Agent → `/gw/anthropic/v1/messages` with mandate token → verify token (NIF) → load mandate + active IR → `decide` (Cedar, NIF) → compute conservative hold → ledger pending linked transfers (budget + goal funds) → stream provider response through, tapping usage → post actual (≤ hold), void remainder → spend record `verified` → broadcast.
 
-**Donation.** Donor → `POST /donations/checkout` → Stripe Checkout (direct charge on org's connected account, application fee) → webhook → ledger: gross inflow to goal (or treasury), linked fee transfers → activity + broadcast.
+**Own funds.** Administrator → `POST /orgs/:slug/contributions` → ledger: `ext_own` → goal or treasury (attested; no money seen) → activity.
+
+**Pledge.** Donor saves a card on the platform → monthly job (1st of the month): the goal's accepted spend that donations didn't pay for, plus the margin, split by pledge caps → off-session direct charge on the org's connected account → ledger: cost part to the treasury and margin part to earnings (both earned), linked fee transfers → activity + broadcast (SPEC-05 §8.4).
+
+**Donation.** Donor → `POST /donations/checkout` (liveness and cap checked) → Stripe Checkout (direct charge on org's connected account, application fee) → webhook → ledger: cost part to the goal's funds and margin part to `margin_held`, linked fee transfers; a new outside-money lot → activity + broadcast. Spend uses lots oldest first; when a task is accepted, the margin on the lot-funded spend moves to the org's earnings (SPEC-05 §8.3).
+
+**Pay.** Monthly job (1st, after pledge charges): each pay rule's share of last month's earnings, up to its cap, moves to payable (`pay.owed`) → an administrator pays the person off-platform and records it with proof (`pay.paid`) (SPEC-05 §8.10).
 
 **Monthly funding.** Oban cron at 00:00 UTC on period start → per goal: allocate `min(fund, treasury available)`; shortfall → `underfunded` → `on_underfunded` (pause or continue); budget accounts reset for the new period.
 
 ## 6. Decision records (ADRs)
 
 - **ADR-1 Postgres ledger, TigerBeetle-shaped.** Accounts/transfers mirror TigerBeetle's model (integer amounts, immutable transfers, two-phase, linked, balance-constraint flags, client IDs). Migration later is an adapter + replay, not a rewrite.
-- **ADR-2 Non-custodial.** Orgs are Stripe Connect Standard accounts; donations are direct charges. openmaru never holds funds. The ledger is an earmarking and accounting mirror reconciled against Stripe.
+- **ADR-2 Non-custodial.** Orgs are Stripe Connect Standard accounts; donations and pledge charges are direct charges. openmaru never holds funds. The ledger is an earmarking and accounting mirror reconciled against Stripe. Because openmaru can't freeze or claw back money, outside money is protected by an honest meter, by paying for work after it is done (pledges), by capping what is held, and by refunding what is unspent (SPEC-05 §8, OQ-16).
 - **ADR-3 In-house narrow gateway, not LiteLLM.** MVP supports exactly two wire formats (Anthropic Messages, OpenAI Chat Completions). Owning the proxy lets holds, mandate-token auth, and ledger posting happen in one process with no second source of budget truth. Revisit if provider count grows beyond ~4.
-- **ADR-4 BYOK everywhere.** Provider and E2B keys are goal secrets; providers bill the org. openmaru never fronts or resells usage.
+- **ADR-4 BYOK everywhere.** Provider and E2B keys are goal secrets; providers bill the org. openmaru never fronts or resells usage. The gateway reaches only provider endpoints on a list platform admins keep, so every metered call is billed by a real provider (SPEC-06 §2.1).
 - **ADR-5 Cedar for policy, Biscuit for tokens.** The maru IR compiles to Cedar policies; approval gates are `forbid … unless context.approved_rules.contains(id)`. Period budgets are enforced by ledger constraints, not Cedar.
 - **ADR-6 SPA over LiveView.** Canvas-heavy, animation-heavy UI plus in-browser WASM compiler; Phoenix serves JSON + Channels only.
 - **ADR-7 Processes are caches.** OTP processes (session servers, goal servers) hold no state that isn't reconstructible from Postgres.

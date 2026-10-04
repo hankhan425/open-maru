@@ -40,8 +40,8 @@ defmodule OpenmaruWeb.FallbackControllerTest do
     idempotency_conflict: 409,
     handle_taken: 409,
     slug_taken: 409,
-    must_be_removed_by_amendment: 409,
     account_exists: 409,
+    exit_not_open: 409,
     payments_not_enabled: 409,
     agent_not_hosted: 409,
     no_compute_budget: 409,
@@ -52,11 +52,22 @@ defmodule OpenmaruWeb.FallbackControllerTest do
     provider_error: 502,
     gateway_timeout: 504,
     task_not_in_goal: 403,
+    operator_unavailable: 403,
+    not_accepting_money: 409,
+    outside_money_cap_reached: 409,
     authorization_pending: 400,
     slow_down: 400,
     expired_token: 400,
     access_denied: 400,
-    invalid_grant: 400
+    invalid_grant: 400,
+    not_acceptable: 406,
+    request_timeout: 408,
+    conflict: 409,
+    payload_too_large: 413,
+    uri_too_long: 414,
+    unsupported_media_type: 415,
+    internal_error: 500,
+    service_unavailable: 503
   ]
 
   for {code, status} <- @spec_codes do

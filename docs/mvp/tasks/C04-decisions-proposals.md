@@ -4,17 +4,18 @@
 |---|---|---|---|
 | Core | C03 | L | 8 |
 
-**Read first:** SPEC-02 §3.4 (holdover), §4 (all), §2 (`decisions`, `ballots`, `proposals`); SPEC-01 §4.7, §9; SPEC-07 §1 "Orgs, specs, decisions", `/me/inbox`.
+**Read first:** SPEC-02 §3.4 (holdover), §4 (all), §2 (`decisions`, `decision_voters`, `ballots`, `proposals`); SPEC-01 §4.7 (member-wide votes count votes cast, OQ-16), §9; SPEC-07 §1 "Orgs, specs, decisions", `/me/inbox`.
 **Paths:** `lib/openmaru/decisions/**`, `lib/openmaru/orgs/proposals.ex`, controllers, migrations
 
 ## Goal
 One decision engine (approve-N / vote-threshold, deadlines, default outcomes) used for amendments now and for gated spend and goal closure later. Amendments flow through it end to end.
 
 ## Deliverables
-- Migrations `decisions`, `ballots`, `proposals`.
+- Migrations `decisions`, `decision_voters`, `ballots`, `proposals`.
 - `Openmaru.Decisions`: `open/1`, `cast/3`, `cancel/2`, `resolve_deadline/1` (Oban worker, idempotent), `register_effect/2` (effect registry keyed by kind; each effect module implements `c:on_pass(multi, decision)` and `c:on_fail(multi, decision)`).
-- Eligibility snapshot rules per SPEC-02 §4.1, including holdover (amend only) and requester/operator exclusion (spend only; takes `exclude_user_ids` in `open/1`).
-- `Openmaru.Orgs.Proposals.create/2`: re-check source (Lang + E501–E504 + **E503** removing an unclosed goal), reject no-op (identical hash → 422 with `details.reason = "no_changes"`), reject stale base (409 `stale_proposal`), store diff, open an `amend` decision using the active spec's `amend` procedure and timeout.
+- Eligibility snapshot rules per SPEC-02 §4.1, stored one row per voter: holdover (amend only), requester/operator exclusion (spend only; takes `exclude_user_ids` in `open/1`), member-wide votes (members of at least 30 days), and amend decisions shrinking to the people who remain.
+- Member-wide votes per SPEC-01 §4.7 and SPEC-02 §4.2–§4.3: 20% turnout, yes ≥ the threshold of votes cast, early end only when the outcome can no longer change. (C07 later leaves silent and suspended people out of every snapshot.)
+- `Openmaru.Orgs.Proposals.create/2`: re-check source (Lang + E501, E502, E504, E505 + **E503** removing an unclosed goal), reject no-op (identical hash → 422 with `details.reason = "no_changes"`), reject stale base (409 `stale_proposal`), store diff, open an `amend` decision using the active spec's `amend` procedure and timeout.
 - Built-in `amend` effect: stale check, `Orgs.activate_version/3`, mark other open amend decisions `stale`.
 - Endpoints: proposals, decisions, ballots, cancel, `GET /me/inbox` (open decisions where the user is eligible and hasn't voted; pending holder acceptances).
 - Events: `decision.opened`, `decision.ballot_cast`, `decision.resolved`.
@@ -40,6 +41,17 @@ One decision engine (approve-N / vote-threshold, deadlines, default outcomes) us
 - [ ] **C04-T18** `/me/inbox` lists eligible, un-voted, open decisions sorted by deadline plus pending holder acceptances; excludes resolved ones.
 - [ ] **C04-T19** Effect registry: a dummy kind registered in test receives on_pass/on_fail exactly once.
 - [ ] **C04-T20** Property (StreamData): random ballot sequences never produce both pass and fail; final status is consistent with counts and `required_yes`.
+- [ ] **C04-T21** Member-wide eligibility: members who joined 29 days before opening are not eligible, at 30 days they are, members who left are not; one `decision_voters` row each, `eligible_count`, `min_turnout = ceil(eligible / 5)`.
+- [ ] **C04-T22** `vote(members, 2/3)` with 100 eligible, `else deny`, at the deadline:
+  - 15 yes, 0 no → below turnout → `expired_failed`;
+  - 20 yes, 5 no → `passed` (20 ≥ ceil(2/3 × 25) = 17);
+  - 14 yes, 11 no → `failed`.
+- [ ] **C04-T23** Early end with 100 eligible and 2/3:
+  - `passed` at the 67th yes; `failed` at the 34th no.
+  - With 90% and `else allow`, 11 no votes and nothing else leave it open, since turnout is below 20% and the deadline would allow it.
+- [ ] **C04-T24** Property (StreamData): whenever a member-wide vote ends early, every possible completion of the remaining ballots leads to the same result at the deadline.
+- [ ] **C04-T25** Amend shrinking: with `amend: approve(core, 2)` and core [mina, jo] where jo's holder row was removed, the amend decision needs 1 (stored procedure `approve(core, 1)`) and passes on mina's vote. A spend decision under `approve(core, 2)` in the same state → `insufficient_eligible`.
+- [ ] **C04-T26** An amend decision whose circle has no eligible holders (all of them departed) runs as `vote(members, 2/3)` with the original timeout and `else`; with no eligible members → `failed` `no_eligible_voters`.
 
 ## Out of scope
 Spend effects (M02), close effects (C06), UI (F04/F05).

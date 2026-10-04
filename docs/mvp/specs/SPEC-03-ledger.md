@@ -4,7 +4,8 @@
 
 - Double-entry, single asset in MVP: **ledger 1 = USD in micro-dollars** (1 USD = 1_000_000).
 - Modeled on TigerBeetle (ADR-1): two tables (accounts, transfers), fixed fields, integer amounts, immutable transfers, client-generated IDs, two-phase transfers, linked chains, balance-constraint flags, balancing transfers. Only `Openmaru.Ledger` touches these tables.
-- The ledger is an **earmarking and accounting mirror**. Real money sits in the org's Stripe account (ADR-2). Reconciliation (SPEC-05 §6) proves the mirror matches.
+- The ledger is an **earmarking and accounting mirror**. Real money sits in the org's Stripe account (ADR-2), or, for own funds, wherever the org keeps it. Reconciliation (SPEC-05 §6) proves the Stripe part of the mirror matches.
+- Money enters as **own funds** (§5.6: the org's own statement; the platform sees no money) or as **outside money** (donations, §5.5, and pledge charges, §5.7). Outside money that has paid for accepted work is **earned**: the org's own, with its margin in the org's earnings (§5.8). Which donation paid for which spend, donations first, is tracked by SPEC-05 §8.3's lots, not by separate ledger accounts.
 - Descriptive metadata (memos, models, receipts) lives in `spend_records` and other control-plane tables keyed by transfer IDs, never in ledger rows.
 
 ## 2. Tables
@@ -57,26 +58,33 @@ Triggers reject UPDATE and DELETE. A partial unique index on `pending_id` (for r
 
 | Account code | Key pattern | Flags | Purpose |
 |---|---|---|---|
-| 100 | `org:<id>:ext_donations` | none | Source of donations (goes debit-heavy) |
+| 100 | `org:<id>:ext_donations` | none | Source of donations and pledge charges (goes debit-heavy) |
+| 101 | `org:<id>:ext_own` | none | Source of own funds (goes debit-heavy) |
 | 110 | `org:<id>:ext_refunds` | none | Sink for refunds |
-| 200 | `org:<id>:treasury` | DMNEC | Unearmarked funds |
-| 210 | `org:<id>:fees_stripe`, `org:<id>:fees_platform` | none | Fees on treasury donations |
+| 120 | `org:<id>:ext_payouts` | none | Sink for pay recorded as paid (§5.8) |
+| 200 | `org:<id>:treasury` | DMNEC | Unearmarked own and earned money; never unspent outside money |
+| 210 | `org:<id>:fees_stripe`, `org:<id>:fees_platform` | none | Org-level fees (donations and pledges name a goal, so their fees go to the goal's 400 accounts) |
+| 220 | `org:<id>:earnings` | DMNEC | Earned margin not yet owed or retained (§5.8) |
+| 230 | `org:<id>:payable` | DMNEC | Pay owed and not yet recorded as paid (§5.8) |
 | 300 | `goal:<id>:funds` | DMNEC | Goal's available funds |
+| 310 | `goal:<id>:margin_held` | DMNEC | Unearned margin of the goal's donations; earned or refunded, never spent |
 | 400 | `goal:<id>:spend:<category>` for `llm, compute, expense, fees_stripe, fees_platform` | none | Consumption sinks |
 | 500 | `mandate:<id>:budget:<category>` | DMNEC | Period allowance |
 | 600 | `system:allowance_source` | none | Source of allowance grants |
 | 610 | `system:allowance_sink` | none | Sink of consumed/reset allowance |
 
-Accounts are created with their owner: org creation creates 100, 110, 200, 210×2; goal adoption creates 300 and 400×5; mandate creation creates one 500 per spend category (new categories later create new accounts). System accounts are created by a migration, with id = `uuidv5(key)` (`13a8b848-795e-5365-8aab-dcb51235c51d` for 600, `3dd63a3b-7c4c-520f-ae03-92e4f528ac2a` for 610).
+Accounts are created with their owner: org creation creates 100, 101, 110, 120, 200, 210×2, 220 and 230; goal adoption creates 300, 310 and 400×5; mandate creation creates one 500 per spend category (new categories later create new accounts). System accounts are created by a migration, with id = `uuidv5(key)` (`13a8b848-795e-5365-8aab-dcb51235c51d` for 600, `3dd63a3b-7c4c-520f-ae03-92e4f528ac2a` for 610).
 
 `create_accounts/1` returns one result per account, like `create_transfers/1`: `{:ok, :created}`, `{:ok, :exists}` (same id, identical `key`, `ledger`, `code`, `flags`), or `{:error, code}` checked in this order: `id_must_not_be_zero` · `exists_with_different_fields` · `flags_are_mutually_exclusive` (both balance flags) · `ledger_must_not_be_zero` · `code_must_not_be_zero` · `key_must_not_be_empty` · `key_exists` (another id holds the key).
 
 | Transfer code | Meaning |
 |---|---|
 | 1 donation · 2 fee_stripe · 3 fee_platform · 4 refund | Stripe flows |
+| 5 own_contribution · 6 pledge_charge · 7 margin_earned · 8 margin_held | Own funds (§5.6) · pledge charges (§5.7) · margin (§5.5, §5.7, §5.8) |
 | 10 allocation · 11 close_disposition | Treasury ↔ goal |
 | 20 spend_llm · 21 spend_compute · 22 spend_expense | Goal consumption |
 | 30 budget_grant · 31 budget_consume · 32 budget_reset | Allowance |
+| 40 pay_owed · 41 pay_recorded · 42 earnings_retained | Earnings and pay (§5.8) |
 
 ## 4. `create_transfers/1` semantics
 
@@ -132,10 +140,28 @@ On mandate creation or limit change mid-period: reset, then grant `max(new_limit
 - Top-up: after any credit to a treasury, for goals of that org with shortfall > 0 in their current period, ordered by adoption time: balancing transfer for the shortfall; update the allocation row; fully covered goals return to `active`.
 
 ### 5.4 Closing a goal
-After voiding holds: `goal:<g>:funds` → `org:<o>:treasury` (or `goal:<other>:funds` for `transfer`), `balancing_debit`, requested = i64 max, code 11, id `uuidv5("close:<g>")`.
+After voiding holds and refunding the goal's unspent outside money (SPEC-05 §8.3), which empties `goal:<g>:margin_held`: `goal:<g>:funds` → `org:<o>:treasury` (or `goal:<other>:funds` for `transfer`), `balancing_debit`, requested = i64 max, code 11, id `uuidv5("close:<g>")`.
 
 ### 5.5 Donations, fees, refunds
-See SPEC-05 §4. Linked chain: `ext_donations` → destination (goal funds or treasury), code 1, gross; destination → fee account, code 2; destination → fee account, code 3. IDs `uuidv5("donation:<charge_id>")`, `uuidv5("fee_stripe:<charge_id>")`, `uuidv5("fee_platform:<charge_id>")`. Refund: destination → `ext_refunds`, code 4, id `uuidv5("refund:<refund_id>")`; if it fails with `exceeds_credits`, retry from treasury; if that fails, mark the donation `refund_unfunded` and alert stewards.
+See SPEC-05 §5. Linked chain: `ext_donations` → goal funds, code 1, the cost part; `ext_donations` → `goal:<g>:margin_held`, code 8, the margin part; goal funds → fee accounts, codes 2 and 3. IDs `uuidv5("donation:<charge_id>")`, `uuidv5("donation_margin:<charge_id>")`, `uuidv5("fee_stripe:<charge_id>")`, `uuidv5("fee_platform:<charge_id>")`. Refund: goal funds and `margin_held` → `ext_refunds`, code 4, ids `uuidv5("refund:<refund_id>")` and `uuidv5("refund_margin:<refund_id>")`; if the first fails with `exceeds_credits`, retry from treasury; if that fails, mark the donation `refund_unfunded` and alert stewards.
+
+### 5.6 Own funds
+An administrator records money the org puts in itself (`POST /orgs/:slug/contributions {goal_id?, amount_micros, memo}`): `org:<o>:ext_own` → `goal:<g>:funds`, or the treasury when no goal is named, code 5, id `uuidv5("contribution:<contribution_id>")`, `user_data_128 = contribution_id`. It is the org's own statement, shown publicly as `attested`: the platform sees no money. It makes the org's own budget spendable (its model and compute bills go to its own provider keys, SPEC-06 §1). A treasury credit triggers top-ups (§5.3).
+
+### 5.7 Pledge charges
+A pledge charge (SPEC-05 §8.4) pays for accepted spend that has already happened, so it is earned money. Linked chain:
+1. `org:<o>:ext_donations` → `org:<o>:treasury`, the cost part, code 6, id `uuidv5("pledge_charge:<charge_id>")`, `user_data_128 = pledge_charge_id`
+2. `org:<o>:ext_donations` → `org:<o>:earnings`, the margin part, code 7, id `uuidv5("pledge_margin:<charge_id>")` (omitted if 0)
+3. `org:<o>:treasury` → `goal:<g>:spend:fees_stripe` (code 2) and → `goal:<g>:spend:fees_platform` (code 3), omitted when 0
+
+The treasury credit triggers top-ups (§5.3). Refunds of pledge charges split like the charge: `treasury` → `ext_refunds` and `earnings` → `ext_refunds`, code 4; if either lacks the balance, the charge is `refund_unfunded` and administrators are alerted.
+
+### 5.8 Earnings and pay
+SPEC-05 §8.10.
+- **Margin earned from a lot:** `goal:<g>:margin_held` → `org:<o>:earnings`, code 7, id `uuidv5("margin:<lot_consumption_id>")`.
+- **Pay owed** (monthly pay run): `earnings` → `org:<o>:payable`, code 40, id `uuidv5("pay_owed:<payout_id>")`.
+- **Pay recorded as paid:** `payable` → `org:<o>:ext_payouts`, code 41, id `uuidv5("pay_recorded:<payout_id>")`.
+- **Earnings retained:** `earnings` → `org:<o>:treasury`, code 42, id `uuidv5("retain:<retention_id>")`; the treasury credit triggers top-ups (§5.3).
 
 ## 6. Spend records and provenance
 
@@ -143,7 +169,7 @@ See SPEC-05 §4. Linked chain: `ext_donations` → destination (goal funds or tr
 
 | Source | Tier | Meta |
 |---|---|---|
-| gateway | verified | provider, model, input/output/cache tokens, provider request id, `estimated` bool |
+| gateway | verified | endpoint (SPEC-06 §2.1), model, input/output/cache tokens, provider request id, `estimated` bool |
 | runtime | verified | session id, seconds, rate |
 | stripe fees | verified | charge id |
 | expense_claim with receipt | evidenced | receipt upload id |
@@ -170,4 +196,4 @@ Status transitions: `pending_approval → held | denied`; `held → posted | voi
 
 ## 9. Public read models
 
-Per goal: current period `{allocated, held, spent, available, shortfall}`; totals by category, tier, and source; daily series (90 days); paginated entries `{spend_id, occurred_at, principal, category, tier, amount, memo, model/tokens, task link}`. Receipts, reimbursement proofs, and donor identities are never public.
+Per goal: current period `{allocated, held, spent, available, shortfall}`; unspent outside money and its cap, accepted spend and pledge charges by month (SPEC-05 §8); per org: earnings, pay owed and pay recorded by month (SPEC-05 §8.10); totals by category, tier, and source; daily series (90 days); paginated entries `{spend_id, occurred_at, principal, category, tier, amount, memo, model/tokens, task link}`. Receipts, reimbursement and payout proofs, and donor identities are never public.

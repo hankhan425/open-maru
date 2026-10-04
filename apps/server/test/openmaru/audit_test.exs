@@ -1,9 +1,12 @@
 defmodule Openmaru.AuditTest do
   use OpenmaruWeb.ConnCase, async: true
 
+  use Oban.Testing, repo: Openmaru.Repo
+
   import Ecto.Query
 
-  alias Openmaru.{Audit, Repo}
+  alias Openmaru.{Audit, ClockMock, Repo}
+  alias Openmaru.Audit.{IpKey, IpKeySweeper}
   alias Openmaru.Test.FakeAuthenticator
 
   defp rows(action) do
@@ -111,12 +114,117 @@ defmodule Openmaru.AuditTest do
     assert with_ip.ip_hash_key_id == Audit.ip_hash_key_id()
     assert without_ip.ip_hash == nil and without_ip.ip_hash_key_id == nil
 
-    key = Application.fetch_env!(:openmaru, Audit)[:ip_hash_key]
-    assert Audit.ip_hash_key_id() == Audit.key_id(key)
-    assert Audit.key_id(key) =~ ~r/\A[0-9a-f]{8}\z/
-    # A rotated key has a different id, so old and new hashes are told apart.
-    refute Audit.key_id(key <> "rotated") == Audit.key_id(key)
-    refute Audit.key_id(key) =~ key
+    # The key row names the wrapping key that sealed it by fingerprint.
+    wrapping_key = Application.fetch_env!(:openmaru, Audit)[:ip_key_wrapping_key]
+    assert Repo.get!(IpKey, with_ip.ip_hash_key_id).wrapping_key_id == Audit.key_id(wrapping_key)
+    assert Audit.key_id(wrapping_key) =~ ~r/\A[0-9a-f]{8}\z/
+    refute Audit.key_id(wrapping_key <> "rotated") == Audit.key_id(wrapping_key)
+    refute Audit.key_id(wrapping_key) =~ wrapping_key
+  end
+
+  describe "IP hash keys (OQ-6)" do
+    @noon ~U[2031-03-10 12:00:00.000000Z]
+    @ip {203, 0, 113, 7}
+
+    defp at(datetime), do: stub(ClockMock, :now, fn -> datetime end)
+    defp hours(n), do: DateTime.add(@noon, n * 3600, :second)
+
+    test "C01-T18 each UTC day hashes with its own random key, stored sealed" do
+      at(@noon)
+      key_id = Audit.ip_hash_key_id()
+      hash = Audit.hash_ip(@ip)
+
+      at(hours(11))
+      assert Audit.ip_hash_key_id() == key_id
+      assert Audit.hash_ip(@ip) == hash
+
+      at(hours(12))
+      refute Audit.ip_hash_key_id() == key_id
+      refute Audit.hash_ip(@ip) == hash
+
+      key = Repo.get!(IpKey, key_id)
+      assert key.day == ~D[2031-03-10]
+      # 12-byte IV, 16-byte tag, 32-byte key: the key itself is never stored in the clear.
+      assert byte_size(key.sealed_key) == 60
+      assert key.destroyed_at == nil
+    end
+
+    test "C01-T18 a key is destroyed 30 days after its day ends" do
+      at(@noon)
+      key_id = Audit.ip_hash_key_id()
+      {:ok, entry} = Audit.record(%{action: "test.retention", ip: @ip})
+
+      at(~U[2031-04-09 23:59:59.999999Z])
+      Audit.destroy_expired_ip_keys()
+      assert Repo.get!(IpKey, key_id).sealed_key
+      assert %{ip_hash_key_id: key_id, ip_hash: entry.ip_hash} in Audit.hashes_for_ip(@ip)
+
+      at(~U[2031-04-10 00:00:00.000000Z])
+      assert Audit.destroy_expired_ip_keys() >= 1
+      key = Repo.get!(IpKey, key_id)
+      assert key.sealed_key == nil
+      assert key.destroyed_at == ~U[2031-04-10 00:00:00.000000Z]
+      refute Enum.any?(Audit.hashes_for_ip(@ip), &(&1.ip_hash_key_id == key_id))
+    end
+
+    test "C01-T18 the hourly sweeper destroys expired keys" do
+      at(@noon)
+      key_id = Audit.ip_hash_key_id()
+
+      at(~U[2031-05-01 00:00:00.000000Z])
+      assert :ok = perform_job(IpKeySweeper, %{})
+      assert Repo.get!(IpKey, key_id).sealed_key == nil
+    end
+
+    test "C01-T18 an address is found across days by its hash under each live key" do
+      at(@noon)
+      {:ok, first} = Audit.record(%{action: "test.lookup", ip: @ip})
+
+      at(hours(24))
+      {:ok, second} = Audit.record(%{action: "test.lookup", ip: "203.0.113.7"})
+      {:ok, _other} = Audit.record(%{action: "test.lookup", ip: {203, 0, 113, 8}})
+
+      lookup = Audit.hashes_for_ip(@ip)
+      assert [%{ip_hash_key_id: newest}, %{ip_hash_key_id: older}] = lookup
+      assert {newest, older} == {second.ip_hash_key_id, first.ip_hash_key_id}
+
+      found =
+        Repo.all(
+          from e in "audit_log",
+            where: e.action == "test.lookup",
+            select: {e.ip_hash_key_id, e.ip_hash}
+        )
+        |> Enum.filter(fn {key_id, hash} ->
+          %{ip_hash_key_id: key_id, ip_hash: hash} in lookup
+        end)
+
+      assert length(found) == 2
+    end
+
+    test "C01-T18 a sealed key moved to another day does not unseal" do
+      at(@noon)
+      key_id = Audit.ip_hash_key_id()
+
+      Repo.update_all(from(k in IpKey, where: k.id == ^key_id), set: [day: ~D[2031-03-11]])
+
+      at(hours(24))
+      assert_raise RuntimeError, ~r/does not unseal/, fn -> Audit.hash_ip(@ip) end
+    end
+
+    test "C01-T18 the database requires a key to be either sealed or destroyed, not both" do
+      for {sealed, destroyed_at} <- [{nil, nil}, {<<0>>, DateTime.utc_now()}] do
+        assert_raise Ecto.ConstraintError, ~r/destroyed/, fn ->
+          Repo.transaction(fn ->
+            Repo.insert!(%IpKey{
+              day: ~D[2031-03-10],
+              wrapping_key_id: "00000000",
+              sealed_key: sealed,
+              destroyed_at: destroyed_at
+            })
+          end)
+        end
+      end
+    end
   end
 
   test "C01-T18 a hash without its key id (or the reverse) is rejected by the database" do

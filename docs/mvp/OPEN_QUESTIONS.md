@@ -20,7 +20,7 @@ ARCHITECTURE > PRD.
 
 ### OQ-1: Envelope code for unhandled errors and transport-level 4xx
 - **Task:** T02
-- **Status:** open
+- **Status:** resolved
 - **Conflict:** SPEC-07 §2 says every error uses the envelope with a stable code, but its table has no
   code for an unhandled server error (HTTP 500) and none for transport-level failures raised before a
   controller runs: 406 (no acceptable format), 413 (body too large), 415 (unsupported media type).
@@ -30,7 +30,17 @@ ARCHITECTURE > PRD.
 - **Chosen (interim):** (a). `Openmaru.Error` knows `internal_error` (500); `OpenmaruWeb.ErrorJSON` maps
   401 → `unauthenticated`, 403 → `forbidden`, 404 → `not_found`, 422 → `validation_failed`,
   429 → `rate_limited`, other 4xx → `invalid_request`, 5xx → `internal_error`, keeping the HTTP status.
-- **Resolution:**
+- **Resolution:** (b) (user, 2026-10-02). The interim choice broke the rule OQ-5 relies on: the
+  code determines the HTTP status (`Openmaru.Error.status/1`), yet a 413 went out as
+  `invalid_request`, which the table maps to 400. Every status the stack raises outside a
+  controller now has a code with that status: `not_acceptable` (406), `request_timeout` (408,
+  Bandit's body read timeout), `conflict` (409, an unhandled `Ecto.StaleEntryError`),
+  `payload_too_large` (413), `uri_too_long` (414, Plug's query-string limit),
+  `unsupported_media_type` (415), `internal_error` (500) and `service_unavailable` (503, the dev
+  repo check). 400, 401, 403, 404, 422 and 429 keep their generic codes. SPEC-07 §2 lists the new
+  codes and states the rule. Tests (T02-T02): a 406 and a 413 through the endpoint, and a guard
+  that every status an exception from Plug, Phoenix, Bandit, Ecto or Postgrex carries renders a
+  code whose status is that status.
 
 ### OQ-2: Money source text in the AST vs. AST equality in L02
 - **Task:** L01
@@ -146,6 +156,18 @@ ARCHITECTURE > PRD.
   would make old hashes unlinkable, if the 30-day intent needs that later. SPEC-09 §7 and
   SPEC-02 §2 are updated. The address hashed is the client's as resolved by trusted-proxy
   handling (SPEC-09 §6), not the load balancer's.
+- **Revised (user, 2026-10-02):** with one long-lived key, every IPv4 hash stayed reversible by the
+  key holder for as long as the key existed, and the append-only table never drops rows, so the
+  30-day intent of SPEC-09 §7 had become "kept forever". Hashed IPs are still personal data while
+  they can be reversed, and data protection law expects such data to have a retention limit.
+  Now each UTC day has its own random key, stored in `audit_ip_hash_keys` sealed under
+  `AUDIT_IP_HASH_KEY`. An hourly job (`Openmaru.Audit.IpKeySweeper`) destroys a key 30 days after
+  its day ends, so an address can be linked to its hashes for at most 31 days. `ip_hash_key_id`
+  is now the id of the day's key row, and `Openmaru.Audit.hashes_for_ip/1` finds an address
+  across the live days. Rotating `AUDIT_IP_HASH_KEY` makes all earlier hashes unlinkable at once.
+  Equal addresses still correlate directly within one day. SPEC-09 §7, SPEC-02 §2 and H02's
+  runbook deliverable are updated. Tests (C01-T18): per-day keys, destruction at the boundary,
+  the sweeper, lookup across days, keys bound to their day, the table constraint, and rotation.
 
 ### OQ-7: A deleted user's handle
 - **Task:** C01 (found while fixing handle rules; H02 implements deletion)
@@ -170,6 +192,8 @@ ARCHITECTURE > PRD.
   removing it, that is a separate path after the MVP. SPEC-09 §4, SPEC-02 §2 and H02-T08 are
   updated. C01's `deleted-user-` prefix reservation stays, so no live handle reads as a deleted
   account.
+- **Follow-up:** what deletion and leaving do to the person's roles in their orgs is OQ-16
+  (resolved; tasks C07, P04, P05).
 
 ### OQ-8: The email field on the sign-in card
 - **Task:** C01 (affects F01)
@@ -189,6 +213,14 @@ ARCHITECTURE > PRD.
   sign-up (c) can be added after the MVP as its own task. Without the field there is no passkey
   autofill (conditional mediation); the passkey button opens the browser's passkey picker.
   SPEC-08 §3 and F01 are updated.
+- **Follow-up (user, 2026-10-02):** with no email there is no account recovery: a user with one
+  passkey who loses it loses the account, and the handle stays taken (OQ-7). That is acceptable
+  while the MVP is not released; a recovery path (email sign-up, or another) is needed before any
+  public release. F01 already offers a second passkey or a linked provider. Testing as several
+  personas (founder, holder, member, operator, agent, donor, visitor) without a passkey or provider
+  account each is planned in H01, not earlier: its e2e-only sign-in is also compiled into dev
+  builds, with a persona seed, a dev-only persona switcher and a token task for the CLI and MCP
+  (H01-T12).
 
 ### OQ-9: Leading zeros in metric values and the spec hash
 - **Task:** L02
@@ -305,6 +337,12 @@ ARCHITECTURE > PRD.
      form. It renders literally, so the charter's structure comes only from the templates.
   2. `## Circles` is omitted when the org has none.
   3. Every number in the text is grouped by thousands.
+- **Follow-up (user, 2026-10-02):** the escaping is written for CommonMark, but nothing said
+  which renderer the web uses. A GFM renderer with autolinks (`marked`'s default) would turn a
+  bare `https://…` or `www.…` in a purpose into a link, which §8 says spec text cannot add.
+  SPEC-08 §4 now pins the web's renderer: one `MarkdownInline` component, CommonMark inline content
+  only, raw HTML off, no GFM extensions, no typographer (F01-T15). SPEC-01 §8 names the assumption,
+  and F03, F04, F05 and F06 render charter strings through the component.
 
 ### OQ-13: Policy ids can collide (`self:<handle>` and the rules of a goal named `self`)
 - **Task:** L06
@@ -373,3 +411,154 @@ ARCHITECTURE > PRD.
   (`CompileError::DuplicatePolicyId`), which the checker no longer emits. Tests: L03-T33
   (`l03_t33_rules_with_one_id_in_a_goal_is_e325`), `l06_rules_with_colliding_ids_do_not_compile`
   (now on an IR edited after checking).
+
+### OQ-16: People who leave or go silent, and protecting other people's money
+- **Task:** review of OQ-7 (affects C03, C04, C06, G02, G03, M02, P01, P02, W03, F06, F07, H01, H02; new tasks C07, L09, P04, P05, P06)
+- **Status:** resolved
+- **Conflict:** OQ-7 kept a deleted user's handle but did not say what happens to that user's
+  roles in the orgs they belong to.
+  - **A deleted holder kept counting.** Effective holders (SPEC-02 §3.4) didn't look at
+    `deleted_at`, so the account still counted in every vote and approval. In lumen
+    (`amend: vote(core, 2/3)`, holders @mina and @jo), jo deleting their account made 2 of 2 votes
+    necessary for good, and after the terms lapsed the holdover rule brought both back as
+    eligible.
+  - **Silence did the same.** A holder in hospital doesn't leave, so they keep counting the same
+    way.
+  - **Agents lost their accountable human.** A deleted operator's agent kept valid tokens for up
+    to 90 days.
+  - **The leave rule was wrong both ways.** Holders and operators couldn't leave while listed,
+    and deletion got around that.
+  - **Member-wide votes couldn't pass at scale.** `vote(members, T)` needed T of all members, so
+    every member who didn't vote counted against it.
+- **Options:** (a) refuse deletion while listed; (b) leaving ends roles and the amend rule shrinks
+  to who remains; (c) as (b) with every rule shrinking; (d) an owner who must transfer ownership
+  before leaving, with successions decided by the owner or the administrators, and forks; (e) the
+  final direction below.
+- **Direction (user, 2026-10-02):** (d) was recorded first, then replaced by (e):
+  - Owners and holders may leave or go silent whenever they like, and many will.
+  - An org that uses only its own money needs no rules for that.
+  - Strict, game-theory-backed rules apply to taking other people's money.
+  - The rule set should hold for orgs of 1 to hundreds of thousands of people.
+  - Member-wide votes count votes cast, and this goes in now.
+- **Resolution (user, 2026-10-02):**
+  1. **No owner role.** Anyone may leave at any time. Leaving (and account deletion, which leaves
+     every org) ends the person's membership, seats, mandates and operator roles at once
+     (SPEC-02 §3.6). An agent whose operator has departed, is silent or suspended is refused with
+     `operator_unavailable`. `must_be_removed_by_amendment` is removed.
+  2. **Silence.** A person with no sign-in or authenticated request for 90 days is silent, and
+     stops counting toward decisions until they return; since the revision, they also aren't paid
+     by pay rules and can't serve as the payments connector. Suspended users don't count either
+     (SPEC-02 §3.4).
+  3. **Amend shrinks.** An amend decision shrinks to the people who remain: all remaining
+     holders, or `vote(members, 2/3)` if the circle has none. Spend and close decisions never
+     shrink (SPEC-02 §4.1). The org is never frozen for good. A 2-person org waits 90 days for a
+     silent partner; a 1-person org goes dormant, or a member it added carries on.
+  4. **Member-wide votes** count votes cast: at least 20% of eligible members must vote, and only
+     members of at least 30 days are eligible. The vote ends early only when the outcome can no
+     longer change (SPEC-01 §4.7, SPEC-02 §4.2–§4.3; the L04 charter sentence is updated). Circle
+     votes still count every holder.
+  5. **Own funds and outside money** (revised 2026-10-03, below). Own funds are recorded by an
+     administrator as `attested` (SPEC-03 §5.6). Outside money pays for accepted work at cost plus
+     the org's margin, under seven platform guarantees (SPEC-05 §8.2–§8.9):
+     - an honest meter: only spend openmaru can vouch for is `verified`, and the gateway reaches
+       only provider endpoints on a list platform admins keep, each with its own prices;
+     - earmarked donations, tracked as first-in-first-out lots that spend uses first and that earn
+       margin only on accepted work;
+     - pledges that pay after the fact, at cost plus margin, for accepted work that donations
+       didn't pay for;
+     - a cap on unspent outside money of 10 × a goal's monthly accepted spend, or a $1,000
+       starting allowance per org;
+     - a 14-day waiting period with donor exit for every amendment that doesn't only tighten;
+     - no new money after 30 days without accepted work and refunds at 90 days, and no new money
+       while whoever connected Stripe is gone;
+     - the recipient's Stripe name shown before anyone pays.
+
+     Everything else about an org is shown, not enforced (SPEC-05 §8.11).
+  6. **Forks** copy only a spec into a new org (SPEC-02 §3.7).
+  7. **Settings.** The margin and pay rules are the org's to set in its spec. No other rule is a
+     spec setting in the MVP. Later, orgs may only make the outside-money values stricter; rules
+     that only affect their own people may become bounded settings (SPEC-05 §8.12). This was the
+     recommendation, which the user did not contest.
+  8. **What this can't do.** Payments are non-custodial, so refunds are best effort. The rules
+     bound outsiders' losses: nothing beyond accepted work for pledges, and at most a goal's cap
+     (about 10 months of accepted spend) plus the $1,000 allowance for donations. Every loss is
+     public (SPEC-05 §8.13).
+  9. **Earnings and pay** (2026-10-03). `margin: P%` sets the org's markup; `pay @h S% <= usd X /
+     month` gives a member a share of each month's earnings, up to a cap (SPEC-01 §4.9). Earnings
+     belong to the org, not a goal. openmaru computes what is owed each month; the org pays
+     off-platform and records each payment with proof (SPEC-05 §8.10).
+
+  Specs updated: PRD, SPEC-01 §4.1, §4.7, §8; SPEC-02; SPEC-03; SPEC-04 §5.1; SPEC-05 §1, §3,
+  §4, §5, §7, §8; SPEC-07; SPEC-08 §3; SPEC-09 §4, §6. Tasks: C07 (leaving, silence, forks), P04
+  (tiers, pledges, caps) and P05 (waiting period, exit, dormancy, continuity) are new; C03, C04,
+  C06, G02, G03, P01, P02, F06, F07, H01, H02 and TASKS.md are updated. The audit brief for
+  outside reviewers summarizes all of it.
+- **Revision (user, 2026-10-03):** The user asked for a minimal rule set under which an org can
+  sustain itself on the platform alone, with the threat models of Patreon, GitHub Sponsors,
+  Kickstarter, GoFundMe and Open Collective in mind: people should see an org's qualities,
+  verify its work, and track how their money was used and what came of it. Reviewing the first
+  resolution against that found three problems:
+  - **The 80% pledge share** made every org pay a fifth of its costs itself, so no org could
+    sustain itself on outside money. It only discouraged waste, which caps, receipts and
+    cancellation already bound.
+  - **A hole in the meter.** A custom `openai_base_url` let an org run a server that reports its
+    own usage, recorded as `verified` spend that pledges and donations would pay for.
+  - **Double payment.** Pledges paid for accepted spend that donations had already paid for.
+
+  Decisions: the platform guarantees a few things and shows the rest (item 5); pledges cover up
+  to 100% of accepted spend plus margin; the margin applies to donations and pledges; pay rules
+  divide org-wide earnings, a percentage up to a monthly cap (item 9); the cap is 10× monthly
+  accepted spend with a $1,000 starting allowance; a review window in which pledgers drop tasks
+  from their next charge comes after the MVP.
+
+  Replaced: funding tiers; the 80% share and the locked `reimbursed` account; E505–E507 as gates
+  (now shown as rule flags, and E505 is the payee check); liveness measured by steward activity
+  at 30/45/60/90 days (now by accepted work, at 30 and 90); the 45-day connector rule (now the
+  90-day silence); pledges following forks.
+
+  Updated: PRD; ARCHITECTURE; SPEC-01 §2, §3, §4.9, §5–§9; SPEC-02 §2, §3.1, §3.4, §3.6, §3.7,
+  §4.4, §5.2, §5.3, §7; SPEC-03 §1, §3, §5.4, §5.5, §5.7, §5.8, §6, §9; SPEC-05 §1, §3–§6, §8;
+  SPEC-06 §3; SPEC-07; SPEC-08 §3; SPEC-09 §4, §6. Tasks: L09 (margin and pay in maru) and P06
+  (earnings, pay rules, payouts) are new; P04 is renamed and rewritten (lots, margin, cap,
+  pledges) and P05 rewritten; C03, C04, C06, C07, G03, P01, P02, P03, W03, F06, F07, H01, H02
+  and TASKS.md are updated. Error codes: `funding_tier_required` is replaced by
+  `not_accepting_money`. OQ-18 is open.
+- **Follow-up (user, 2026-10-03):** the first fix for the meter hole labelled custom upstreams
+  `attested` and refused them while a goal held donations. The user asked why custom addresses
+  were allowed at all. The free-form `openai_base_url` is gone: the gateway reaches only provider
+  endpoints on a list platform admins keep, each with its own prices, and a goal picks one per
+  wire format (SPEC-06 §2). This closes the hole outright, prices hosts other than OpenAI
+  correctly, and removes a server-side fetch of a user-supplied URL (SPEC-09 §5). Self-hosted
+  models are out of scope until listed. Updated: PRD, ARCHITECTURE ADR-4, SPEC-03 §6, SPEC-05
+  §8.2, SPEC-06 §1–§3, SPEC-07, SPEC-08 §3, SPEC-09 §5–§6; tasks W01 (renamed), W02, W03, P04,
+  F08, H01.
+
+### OQ-17: Do upfront donations stay in the MVP?
+- **Task:** OQ-16 (affects P02, P04, P05, F07, H01)
+- **Status:** open
+- **Conflict:** The PRD's core loop and success criteria were written around donations made
+  before the work. Under OQ-16 they need most of the protection: lots and unearned margin, the
+  cap and starting allowance, the waiting period and exit, dormancy refunds and continuity.
+  Pledges pay only for accepted work and need almost none of it.
+- **Options:** (a) keep both in the MVP; (b) ship pledges only, and move upfront donations
+  (P02's checkout, the lots and cap in P04, and most of P05) after the MVP.
+- **Chosen (interim):** (a), so the plan and specs cover the complete rule set; cutting (b) later
+  removes work rather than adding it.
+- **Resolution:**
+
+### OQ-18: Can a one-person org earn from outside money?
+- **Task:** OQ-16 revision (affects SPEC-02 §6.1, SPEC-05 §8.1, P04)
+- **Status:** open
+- **Conflict:** Accepted spend needs a task accepted by a steward holder other than the claimant
+  and the claimant agent's operator (SPEC-02 §6.1). A founder working alone with an agent can
+  never accept the agent's work, so the org never has accepted spend: pledges charge nothing,
+  no margin is earned, and its cap stays at the $1,000 starting allowance. That blocks the
+  Patreon-like case of one person with agents sustaining themselves, while a second account of
+  the same person gets around the rule.
+- **Options:** (a) keep the rule: a founder working alone invites a second person to review;
+  (b) let an operator accept their own agent's work, labelled self-reviewed on receipts and in
+  the review disclosure, and let each pledger choose whether to pay for self-reviewed work;
+  (c) as (b), without the choice.
+- **Chosen (interim):** (a), the existing rule. Nothing built so far depends on the choice; P04
+  is the first task that does.
+- **Resolution:**

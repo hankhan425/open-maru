@@ -12,8 +12,8 @@ defmodule Openmaru.Error do
 
   @type t :: %__MODULE__{code: atom(), message: String.t(), details: map()}
 
-  # SPEC-07 §2. `internal_error` is not in the spec table; it is the envelope code for
-  # unhandled 5xx errors (docs/mvp/OPEN_QUESTIONS.md OQ-1).
+  # SPEC-07 §2. The last group names the HTTP statuses raised outside controllers
+  # (transport errors, unhandled exceptions), so every status has its own code (OQ-1).
   @statuses %{
     unauthenticated: 401,
     invalid_token: 401,
@@ -32,6 +32,7 @@ defmodule Openmaru.Error do
     not_claimant: 403,
     self_review_forbidden: 403,
     task_not_in_goal: 403,
+    operator_unavailable: 403,
     budget_exceeded: 402,
     goal_funds_insufficient: 402,
     goal_paused: 423,
@@ -52,8 +53,10 @@ defmodule Openmaru.Error do
     idempotency_conflict: 409,
     handle_taken: 409,
     slug_taken: 409,
-    must_be_removed_by_amendment: 409,
     account_exists: 409,
+    exit_not_open: 409,
+    not_accepting_money: 409,
+    outside_money_cap_reached: 409,
     payments_not_enabled: 409,
     agent_not_hosted: 409,
     no_compute_budget: 409,
@@ -67,7 +70,15 @@ defmodule Openmaru.Error do
     expired_token: 400,
     access_denied: 400,
     invalid_grant: 400,
-    internal_error: 500
+    # Raised before or outside a controller (`OpenmaruWeb.ErrorJSON`).
+    not_acceptable: 406,
+    request_timeout: 408,
+    conflict: 409,
+    payload_too_large: 413,
+    uri_too_long: 414,
+    unsupported_media_type: 415,
+    internal_error: 500,
+    service_unavailable: 503
   }
 
   @doc """

@@ -16,7 +16,7 @@ One page explains an org: what it's for, who governs it, how rules read in plain
 
 ## Tests to write first
 - [ ] **F03-T01** Lumen fixture: name, purpose, circle `core` with @mina effective, @jo pending (if fixture says so), 1 vacancy; goal row with funding bar and status chip.
-- [ ] **F03-T02** Charter view renders API sections; Source view highlights keywords/strings/numbers/handles; toggle reflected in `?view=source` and restored on load.
+- [ ] **F03-T02** Charter view renders API sections (every string through `MarkdownInline`, SPEC-08 §4); Source view highlights keywords/strings/numbers/handles; toggle reflected in `?view=source` and restored on load.
 - [ ] **F03-T03** Version selector lists versions; choosing v1 shows v1's charter and a "not current" note.
 - [ ] **F03-T04** Membership: `open` → Join button; `invite` → explanation plus Sponsor action for members; pending holder sees Accept/Decline banner.
 - [ ] **F03-T05** Related orgs list (shared members) links to their pages.

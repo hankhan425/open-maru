@@ -12,7 +12,7 @@ Prove daily that the ledger mirrors Stripe for every connected account; surface 
 
 ## Deliverables
 - Migration `reconciliation_runs`.
-- Daily Oban job at 02:00 UTC per connected account; pagination over balance transactions; matching by charge/refund ids to ledger transfers with codes 1–4.
+- Daily Oban job at 02:00 UTC per connected account, replaced accounts included (SPEC-05 §8.8); pagination over balance transactions; matching by charge/refund ids as SPEC-05 §6 says: a charge's gross against the sum of its inflow transfers (codes 1 and 8 for a donation, 6 and 7 for a pledge charge, which P04 adds), fees against codes 2–3, refunds against code 4.
 - Alerts to administrators and platform admins; `GET /orgs/:slug/payments/reconciliation` (administrators).
 
 ## Tests to write first
